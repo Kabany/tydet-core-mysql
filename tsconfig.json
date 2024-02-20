@@ -1,0 +1,23 @@
+{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "esModuleInterop": true,
+     "noImplicitAny": false,
+     "noEmitOnError": true,
+     "removeComments": false,
+     "sourceMap": true,
+     "declaration": true,
+     "target": "es5",
+     "outDir": "dist/",
+     "lib": ["ES2021"]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+   "node_modules",
+   "tests",
+   "docs",
+   "dist"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "name": "tydet-core-mysql",
+  "version": "1.0.0",
+  "description": "TyDeT Core MySQL is a Typescript & Javascript library for TyDeT Core to handle connections with a MySQL Database.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "keywords": [
+    "typescript",
+    "tydet",
+    "tydet core",
+    "mysql"
+  ],
+  "license": "MIT",
+  "author": "Kabany <developers@kabany.io>",
+  "homepage": "https://github.com/Kabany/tydet-core-mysql#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kabany/tydet-core-mysql.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Kabany/tydet-core-mysql/issues",
+    "email": "developers@kabany.io"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.7",
+    "@babel/preset-env": "^7.23.8",
+    "@babel/preset-typescript": "^7.23.3",
+    "@types/jest": "^29.5.11",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "jest-editor-support": "^31.1.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "tydet-core": "^1.0.1"
+  }
+}
