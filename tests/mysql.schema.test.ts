@@ -92,6 +92,16 @@ describe("Mysql Schema", () => {
       expect(result.params[3]).toBe(1)
       expect(result.query).toBe("UPDATE `users` SET `firstName` = ?, `lastName` = ?, `email` = ? WHERE `id` = ?;")
     })
+    it("Use remove from User instance", async () => {
+      let user = new User({
+        firstName: "First",
+        id: 1
+      })
+      let result = await user.remove(null as any)
+      expect(result.params.length).toBe(1)
+      expect(result.params[0]).toBe(1)
+      expect(result.query).toBe("DELETE FROM `users` WHERE `id` = ?;")
+    })
     it("Throw validation errors", async () => {
       let user = new User({
         firstName: "First"
@@ -109,6 +119,14 @@ describe("Mysql Schema", () => {
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.lastName).toBe("REQUIRED")
+        expect(err.errors.id).toBe("REQUIRED")
+      }
+
+      try {
+        let result = await user.remove(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.lastName).toBeUndefined()
         expect(err.errors.id).toBe("REQUIRED")
       }
     })

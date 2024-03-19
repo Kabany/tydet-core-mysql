@@ -417,6 +417,36 @@ export class MysqlEntity {
     }
   }
 
+  async remove(db: MysqlConnector) {
+    let columns = (this.constructor as any).getColumns()
+    let table = (this.constructor as any).getTableName()
+    let rmv: MysqlQuery = {query: "", params: []}
+    rmv.query = `DELETE FROM \`${table}\` WHERE `
+    let pk: MysqlEntityParameter
+    for (let column of columns) {
+      if (column.primaryKey) {
+        pk = column
+        break
+      }
+    }
+    
+    if (pk != null && this[pk.name] != null) {
+      rmv.query += `\`${pk.columnName}\` = ?;`
+      rmv.params.push(this[pk.name])
+    } else {
+      let err = {}
+      err[pk.name] = MysqlValidationError.REQUIRED
+      throw new MysqlEntityValidationError("No PK was found or it is null", err)
+    }
+
+    if (db == null) {
+      return rmv
+    } else {
+      let result = await db.run(rmv)
+      return result.affectedRows
+    }
+  }
+
   async validate(db: MysqlConnector, insert: boolean = false) {
     let columns = (this.constructor as any).getColumns()
     let errors: any = {}
