@@ -3,7 +3,7 @@ import { MysqlDataType } from "./mysql.schema"
 import { MysqlQuery } from "./mysql.service"
 
 
-
+// Table operations
 
 interface MysqlColumnOptions {
   size?: number
@@ -249,3 +249,10 @@ class MysqlAlterTableQuery {
 export function AlterTable(table: string) {
   return new MysqlAlterTableQuery(table)
 }
+
+
+
+
+
+// CRUD operations
+

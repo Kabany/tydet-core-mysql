@@ -37,8 +37,10 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@types/uuid": "^9.0.8",
     "mysql": "^2.18.1",
-    "tydet-core": "^1.0.2",
-    "tydet-utils": "^1.2.0"
+    "tydet-core": "^1.0.3",
+    "tydet-utils": "^1.2.1",
+    "uuid": "^9.0.1"
   }
 }

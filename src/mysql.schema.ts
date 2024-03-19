@@ -1,5 +1,7 @@
-import { MysqlCoreError } from "./mysql.error"
-import { MysqlQuery } from "./mysql.service"
+import { StringUtils, DateUtils } from "tydet-utils"
+import { v1, v4 } from "uuid"
+import { MysqlEntityValidationError } from "./mysql.error"
+import { MysqlConnector, MysqlQuery } from "./mysql.service"
 
 
 export enum MysqlDataType {
@@ -18,7 +20,429 @@ export enum MysqlDataType {
 }
 
 
+export enum MysqlDefaultValues {
+  NULL = "NULL",
+  DATENOW = "DATENOW",
+  UUIDV1 = "UUIDV1",
+  UUIDV4 = "UUIDV4"
+}
 
+export enum MysqlValidationError {
+  REQUIRED = "REQUIRED",
+  INVALID_TYPE = "INVALID_TYPE",
+  INVALID_VALUE = "INVALID_VALUE",
+  MAX_VALUE = "MAX_VALUE",
+  MIN_VALUE = "MIN_VALUE",
+  MAX_LENGTH = "MAX_LENGTH",
+  MIN_LENGTH = "MIN_LENGTH"
+}
+
+interface MysqlEntityParameter {
+  name: string
+  type: MysqlDataType
+  default: any,
+  required: boolean,
+  primaryKey: boolean,
+  columnName: string,
+  unique: boolean
+  validators: ((value: any) => MysqlParameterValidation)[]
+}
+
+interface MysqlParameterValidation {
+  success: boolean
+  message?: string
+}
+
+interface MysqlEntityColumn {
+  type: MysqlDataType,
+  default?: any,
+  required?: boolean
+  columnName?: string,
+  primaryKey?: boolean,
+  unique?: boolean
+  validators?: ((data: any) => boolean | MysqlParameterValidation)[]
+}
+
+interface MysqlEntityStringColumn extends MysqlEntityColumn {
+  type: MysqlDataType.VARCHAR | MysqlDataType.TEXT | MysqlDataType.LONGTEXT
+  minLen?: number
+  maxLen?: number
+}
+
+interface MysqlEntityNumberColumn extends MysqlEntityColumn {
+  type: MysqlDataType.DECIMAL | MysqlDataType.TINYINT | MysqlDataType.SMALLINT | MysqlDataType.MEDIUMINT | MysqlDataType.INT | MysqlDataType.BIGINT
+  min?: number
+  max?: number
+}
+
+interface MysqlEntityOptions {
+  readColumn: boolean
+}
+
+export class MysqlEntity {
+  static getTableName() {
+    return this.name
+  }
+
+  static getPrimaryKey() {
+    return null
+  }
+
+  static getColumns() {
+    return []
+  }
+
+  static DefineSchema(table: string, columns: {[column:string]: MysqlEntityColumn | MysqlDataType}, associations?: any[]) {
+    this.getTableName = () => {
+      return table
+    }
+    
+    let primaryKey: string
+    let parameters: MysqlEntityParameter[] = []
+    for (let column of Object.keys(columns)) {
+      if ((columns[column] as MysqlDataType) in MysqlDataType) {
+        let data = columns[column] as MysqlDataType
+        parameters.push({
+          name: column,
+          type: data,
+          default: undefined,
+          required: false,
+          primaryKey: false,
+          columnName: column,
+          validators: [],
+          unique: false
+        })
+      } else {
+        let data = columns[column] as MysqlEntityColumn
+        let parameter: MysqlEntityParameter = {
+          name: column,
+          type: data.type,
+          default: data.default,
+          required: data.required === true,
+          primaryKey: data.primaryKey === true,
+          columnName: data.columnName || column,
+          unique: data.unique === true,
+          validators: []
+        }
+        if (data.primaryKey === true) {
+          primaryKey = column
+        }
+        let validators = []
+        if ([MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.DECIMAL].indexOf(data.type) >= 0) {
+          // type
+          let t = (value) => {
+            if (typeof value === "number" || value === null || value === undefined) {
+              return {success: true}
+            } else {
+              return {success: false, message: MysqlValidationError.INVALID_TYPE}
+            }
+          }
+          validators.push(t)
+  
+          // required
+          if (data.required === true) {
+            let r = (value) => {
+              if (value === null || value === undefined) {
+                return {success: false, message: MysqlValidationError.REQUIRED}
+              } else {
+                return {success: true}
+              }
+            }
+            validators.push(r)
+          }
+  
+          // min
+          if ((data as MysqlEntityNumberColumn).min != null) {
+            let m = (value) => {
+              if (typeof value === "number" && value >= (data as MysqlEntityNumberColumn).min) {
+                return {success: true}
+              } else {
+                return {success: false, message: MysqlValidationError.MIN_VALUE}
+              }
+            }
+            validators.push(m)
+          }
+  
+          // max
+          if ((data as MysqlEntityNumberColumn).max != null) {
+            let m = (value) => {
+              if (typeof value === "number" && value <= (data as MysqlEntityNumberColumn).max) {
+                return {success: true}
+              } else {
+                return {success: false, message: MysqlValidationError.MAX_VALUE}
+              }
+            }
+            validators.push(m)
+          }
+        } else if ([MysqlDataType.VARCHAR, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(data.type) >= 0) {
+          // type
+          let t = (value) => {
+            if (StringUtils.isNotEmpty(value) || value === null || value === undefined) {
+              return {success: true}
+            } else {
+              return {success: false, message: MysqlValidationError.INVALID_TYPE}
+            }
+          }
+          validators.push(t)
+  
+          // required
+          if (data.required === true) {
+            let r = (value) => {
+              if (!StringUtils.isNotBlank(value) || value === null || value === undefined) {
+                return {success: false, message: MysqlValidationError.REQUIRED}
+              } else {
+                return {success: true}
+              }
+            }
+            validators.push(r)
+          }
+  
+          // min
+          if ((data as MysqlEntityStringColumn).minLen != null) {
+            let m = (value) => {
+              if (StringUtils.length(value) >= (data as MysqlEntityStringColumn).minLen) {
+                return {success: true}
+              } else {
+                return {success: false, message: MysqlValidationError.MIN_LENGTH}
+              }
+            }
+            validators.push(m)
+          }
+  
+          // max
+          if ((data as MysqlEntityStringColumn).maxLen != null) {
+            let m = (value) => {
+              if (StringUtils.length(value) <= (data as MysqlEntityStringColumn).maxLen) {
+                return {success: true}
+              } else {
+                return {success: false, message: MysqlValidationError.MIN_LENGTH}
+              }
+            }
+            validators.push(m)
+          }
+        } else if (data.type == MysqlDataType.BOOLEAN) {
+          // type
+          let t = (value) => {
+            if (typeof value == "boolean" || value === null || value === undefined) {
+              return {success: true}
+            } else {
+              return {success: false, message: MysqlValidationError.INVALID_TYPE}
+            }
+          }
+          validators.push(t)
+  
+          // required
+          if (data.required === true) {
+            let r = (value) => {
+              if (value === true || value === false) {
+                return {success: true}
+              } else {
+                return {success: false, message: MysqlValidationError.REQUIRED}
+              }
+            }
+            validators.push(r)
+          }
+        } else if (data.type == MysqlDataType.DATE || data.type == MysqlDataType.DATETIME) {
+          // type
+          let t = (value) => {
+            if (DateUtils.isValid(value) || value === null || value === undefined) {
+              return {success: true}
+            } else {
+              return {success: false, message: MysqlValidationError.INVALID_TYPE}
+            }
+          }
+          validators.push(t)
+  
+          // required
+          if (data.required === true) {
+            let r = (value) => {
+              if (value === null || value === undefined) {
+                return {success: false, message: MysqlValidationError.REQUIRED}
+              } else {
+                return {success: true}
+              }
+            }
+            validators.push(r)
+          }
+        }
+        parameter.validators = validators
+        parameters.push(parameter)
+      }
+    }
+
+    if (primaryKey != null) {
+      this.getPrimaryKey = () => {
+        return primaryKey
+      }
+    }
+
+    this.getColumns = () => {
+      return parameters
+    }
+
+    return this
+  }
+
+  constructor(data?: any, options?: MysqlEntityOptions) {
+    let opts = options || {readColumn: false}
+    let columns = (this.constructor as any).getColumns()
+
+    if (data != null) {
+      for (let column of columns) {
+        (this as any)[column.name] = data[opts.readColumn ? column.columnName : column.name]
+
+        if (column.type == MysqlDataType.DATE || column.type == MysqlDataType.DATETIME) {
+          if ((this as any)[column.name] !== null && (this as any)[column.name] !== undefined) {
+            (this as any)[column.name] = new Date((this as any)[column.name])
+          } else {
+            if (typeof column.default == "function") {
+              (this as any)[column.name] = column.default()
+            } else if (column.default == MysqlDefaultValues.DATENOW) {
+              (this as any)[column.name] = new Date()
+            } else {
+              (this as any)[column.name] = column.default
+            }
+          }
+        } else if (column.type == MysqlDataType.BOOLEAN) {
+          if ((this as any)[column.name] !== null && (this as any)[column.name] !== undefined) {
+            if (typeof (this as any)[column.name] == "number") {
+              (this as any)[column.name] = (this as any)[column.name] === 1
+            }
+          } else {
+             if (typeof column.default == "function") {
+              (this as any)[column.name] = column.default()
+            } else {
+              (this as any)[column.name] = column.default
+            }
+          }
+        } else if ([MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.DECIMAL].indexOf(data.type) >= 0) {
+          if ((this as any)[column.name] === null || (this as any)[column.name] === undefined) {
+            if (typeof column.default == "function") {
+              (this as any)[column.name] = column.default()
+            } else {
+              (this as any)[column.name] = column.default
+            }
+          }
+        } else if ([MysqlDataType.VARCHAR, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(data.type) >= 0) {
+          if ((this as any)[column.name] === null || (this as any)[column.name] === undefined) {
+            if (typeof column.default == "function") {
+              (this as any)[column.name] = column.default()
+            } else if (column.default == MysqlDefaultValues.UUIDV1) {
+              (this as any)[column.name] = v1()
+            } else if (column.default == MysqlDefaultValues.UUIDV4) {
+              (this as any)[column.name] = v4()
+            } else {
+              (this as any)[column.name] = column.default
+            }
+          }
+        }
+      }
+    }
+  }
+
+  async insert(db: MysqlConnector) {
+    let errors = await this.validate(db, true)
+    if (Object.keys(errors).length > 0) {
+      throw new MysqlEntityValidationError("Some errors were found in the entity", errors)
+    }
+
+    let columns = (this.constructor as any).getColumns()
+    let table = (this.constructor as any).getTableName()
+    let ins: MysqlQuery = {query: "", params: []}
+    ins.query = `INSERT INTO \`${table}\` (`
+    let qparams = `VALUES (`
+    let isFirst = true
+    let pk: MysqlEntityParameter
+    for (let column of columns) {
+      if (column.primaryKey) {
+        pk = column
+        continue
+      }
+
+      if (isFirst) {
+        isFirst = false
+      } else {
+        ins.query += ", "
+        qparams += ", "
+      }
+      ins.query += `\`${column.columnName}\``
+      qparams += "?"
+      ins.params.push(this[column.name])
+    }
+    ins.query += `) ${qparams});`
+
+    if (db == null) {
+      return ins
+    } else {
+      let result = await db.run(ins)
+      this[pk.name] = result.insertId
+      return result.insertId
+    }
+  }
+
+  async update(db: MysqlConnector) {
+    let errors = await this.validate(db)
+    if (Object.keys(errors).length > 0) {
+      throw new MysqlEntityValidationError("Some errors were found in the entity", errors)
+    }
+
+    let columns = (this.constructor as any).getColumns()
+    let table = (this.constructor as any).getTableName()
+    let upt: MysqlQuery = {query: "", params: []}
+    upt.query = `UPDATE \`${table}\` SET `
+    let isFirst = true
+    let pk: MysqlEntityParameter
+    for (let column of columns) {
+      if (column.primaryKey) {
+        pk = column
+        continue
+      }
+
+      if (isFirst) {
+        isFirst = false
+      } else {
+        upt.query += ", "
+      }
+      upt.query += `\`${column.columnName}\` = ?`
+      upt.params.push(this[column.name])
+    }
+    upt.query += ` WHERE \`${pk.columnName}\` = ?;`
+    upt.params.push(this[pk.name])
+
+    if (db == null) {
+      return upt
+    } else {
+      let result = await db.run(upt)
+      return result.changedRows
+    }
+  }
+
+  async validate(db: MysqlConnector, insert: boolean = false) {
+    let columns = (this.constructor as any).getColumns()
+    let errors: any = {}
+    for await (let column of columns) {
+      for (let validation of column.validators) {
+        let result = validation(this[column.name])
+        if (result === true || (result as MysqlParameterValidation).success == true) {
+          // OK
+        } else if (result === false) {
+          errors[column.name] = MysqlValidationError.INVALID_VALUE
+          break
+        } else if ((result as MysqlParameterValidation).success == false) {
+          errors[column.name] = (result as MysqlParameterValidation).message || MysqlValidationError.INVALID_VALUE
+          break
+        }
+      }
+      if (errors[column.name] == null && column.unique === true) {
+        // TODO
+      } else if (errors[column.name] == MysqlValidationError.REQUIRED && column.primaryKey == true && insert) {
+        // skip
+        delete errors[column.name]
+      }
+    }
+    return errors
+  }
+}
 
 
 
