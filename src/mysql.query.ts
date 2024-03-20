@@ -45,59 +45,59 @@ class MysqlCreateTableQuery {
     if (this.columns.length == 0) {
       throw new MysqlCoreError(`No columns defined for the table'${this.table}'`);
     }
-    let data: MysqlQuery = {query: "", params: []}
-    data.query += `CREATE TABLE${this.ifNotExists ? " IF NOT EXISTS" : ""} \`${this.table}\` (`
+    let data: MysqlQuery = {sql: "", params: []}
+    data.sql += `CREATE TABLE${this.ifNotExists ? " IF NOT EXISTS" : ""} \`${this.table}\` (`
     let isFirst = true
     for (let column of this.columns) {
       if (isFirst) {
         isFirst = false
       } else {
-        data.query += `, `
+        data.sql += `, `
       }
 
-      data.query += `\`${column.name}\` ${column.type}`
+      data.sql += `\`${column.name}\` ${column.type}`
 
       if (column.type == MysqlDataType.DECIMAL) {
         if (column.size == null) column.size = 10
         if (column.decimal == null) column.decimal = 2
-        data.query += `(${column.size},${column.decimal})`
+        data.sql += `(${column.size},${column.decimal})`
       } else if (column.type == MysqlDataType.VARCHAR) {
         if (column.size == null) column.size = 255
-        data.query += `(${column.size})`
+        data.sql += `(${column.size})`
       } else if ([MysqlDataType.BOOLEAN, MysqlDataType.DATE, MysqlDataType.DATETIME, MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(column.type) >= 0) {
         // add nothing
       } else {
         if (column.size == null) {
           // do nothing
         } else {
-          data.query += `(${column.size})`
+          data.sql += `(${column.size})`
         }
       }
 
       if (column.nullable) {
-        data.query += ` NULL`
+        data.sql += ` NULL`
       } else {
-        data.query += ` NOT NULL`
+        data.sql += ` NOT NULL`
       }
 
       if (column.unique && [MysqlDataType.BOOLEAN, MysqlDataType.DATE, MysqlDataType.DATETIME].indexOf(column.type) == -1) {
-        data.query += ` UNIQUE`
+        data.sql += ` UNIQUE`
       }
 
       if (column.autoincrement && [MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT].indexOf(column.type) >= 0) {
-        data.query += ` AUTO_INCREMENT`
+        data.sql += ` AUTO_INCREMENT`
       }
 
       if (column.default !== undefined) {
-        data.query += ` DEFAULT ?`
+        data.sql += ` DEFAULT ?`
         data.params.push(column.default)
       }
 
       if (column.primaryKey && [MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.VARCHAR].indexOf(column.type) >= 0) {
-        data.query += `, PRIMARY KEY (\`${column.name}\`)`;
+        data.sql += `, PRIMARY KEY (\`${column.name}\`)`;
       }
     }
-    data.query += `);`
+    data.sql += `);`
     return data
   }
 }
@@ -107,12 +107,12 @@ export function CreateTable(table: string, ifNotExists: boolean = true) {
 }
 
 export function DropTable(table: string, ifNotExists: boolean = true) {
-  let data: MysqlQuery = {query: `DROP TABLE${ifNotExists ? " IF NOT EXISTS" : ""} \`${table}\`;`, params: []}
+  let data: MysqlQuery = {sql: `DROP TABLE${ifNotExists ? " IF NOT EXISTS" : ""} \`${table}\`;`, params: []}
   return data
 }
 
 export function RenameTable(oldName: string, newName: string) {
-  let data: MysqlQuery = {query: `ALTER TABLE \`${oldName}\` RENAME TO \`${newName}\`;`, params: []}
+  let data: MysqlQuery = {sql: `ALTER TABLE \`${oldName}\` RENAME TO \`${newName}\`;`, params: []}
   return data
 }
 
@@ -181,67 +181,67 @@ class MysqlAlterTableQuery {
     if (this.changes.length == 0) {
       throw new MysqlCoreError(`No changes defined for the table'${this.table}'`);
     }
-    let data: MysqlQuery = {query: "", params: []}
-    data.query += `ALTER TABLE \`${this.table}\``
+    let data: MysqlQuery = {sql: "", params: []}
+    data.sql += `ALTER TABLE \`${this.table}\``
     let isFirst = true
     for (let change of this.changes) {
       if (isFirst) {
         isFirst = false
       } else {
-        data.query += `,`
+        data.sql += `,`
       }
 
-      data.query += ` ${change.action} \`${change.name}\``
+      data.sql += ` ${change.action} \`${change.name}\``
 
       if (change.action == MysqlAlterAction.DROP_COLUMN) {
         // add nothing
       } else {
-        data.query += ` ${change.type}`
+        data.sql += ` ${change.type}`
 
         if (change.type == MysqlDataType.DECIMAL) {
           if (change.size == null) change.size = 10
           if (change.decimal == null) change.decimal = 2
-          data.query += `(${change.size},${change.decimal})`
+          data.sql += `(${change.size},${change.decimal})`
         } else if (change.type == MysqlDataType.VARCHAR) {
           if (change.size == null) change.size = 255
-          data.query += `(${change.size})`
+          data.sql += `(${change.size})`
         } else if ([MysqlDataType.BOOLEAN, MysqlDataType.DATE, MysqlDataType.DATETIME, MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(change.type) >= 0) {
           // add nothing
         } else {
           if (change.size == null) {
             // do nothing
           } else {
-            data.query += `(${change.size})`
+            data.sql += `(${change.size})`
           }
         }
 
         if (change.nullable) {
-          data.query += ` NULL`
+          data.sql += ` NULL`
         } else {
-          data.query += ` NOT NULL`
+          data.sql += ` NOT NULL`
         }
 
         if (change.unique && [MysqlDataType.BOOLEAN, MysqlDataType.DATE, MysqlDataType.DATETIME].indexOf(change.type) == -1) {
-          data.query += ` UNIQUE`
+          data.sql += ` UNIQUE`
         }
   
         if (change.autoincrement && [MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT].indexOf(change.type) >= 0) {
-          data.query += ` AUTO_INCREMENT`
+          data.sql += ` AUTO_INCREMENT`
         }
   
         if (change.default !== undefined) {
-          data.query += ` DEFAULT ?`
+          data.sql += ` DEFAULT ?`
           data.params.push(change.default)
         }
 
         if (change.after == "FIRST") {
-          data.query += ` FIRST`
+          data.sql += ` FIRST`
         } else if (change.after != null) {
-          data.query += ` AFTER \`${change.after}\``
+          data.sql += ` AFTER \`${change.after}\``
         }
       }
     }
-    data.query += `;`
+    data.sql += `;`
     return data
   }
 }

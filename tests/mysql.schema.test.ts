@@ -75,7 +75,7 @@ describe("Mysql Schema", () => {
       expect(result.params[0]).toBe("First")
       expect(result.params[1]).toBe("Last")
       expect(result.params[2]).toBeUndefined()
-      expect(result.query).toBe("INSERT INTO `users` (`firstName`, `lastName`, `email`) VALUES (?, ?, ?);")
+      expect(result.sql).toBe("INSERT INTO `users` (`firstName`, `lastName`, `email`) VALUES (?, ?, ?);")
     })
     it("Use update from User instance", async () => {
       let user = new User({
@@ -90,7 +90,7 @@ describe("Mysql Schema", () => {
       expect(result.params[1]).toBe("updated")
       expect(result.params[2]).toBeUndefined()
       expect(result.params[3]).toBe(1)
-      expect(result.query).toBe("UPDATE `users` SET `firstName` = ?, `lastName` = ?, `email` = ? WHERE `id` = ?;")
+      expect(result.sql).toBe("UPDATE `users` SET `firstName` = ?, `lastName` = ?, `email` = ? WHERE `id` = ?;")
     })
     it("Use remove from User instance", async () => {
       let user = new User({
@@ -100,7 +100,7 @@ describe("Mysql Schema", () => {
       let result = await user.remove(null as any)
       expect(result.params.length).toBe(1)
       expect(result.params[0]).toBe(1)
-      expect(result.query).toBe("DELETE FROM `users` WHERE `id` = ?;")
+      expect(result.sql).toBe("DELETE FROM `users` WHERE `id` = ?;")
     })
     it("Throw validation errors", async () => {
       let user = new User({

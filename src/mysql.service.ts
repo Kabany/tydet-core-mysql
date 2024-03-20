@@ -11,8 +11,9 @@ interface MysqlParamsInterface {
 }
 
 export interface MysqlQuery {
-  query: string
+  sql: string
   params: any[]
+  nested?: boolean
 }
 
 export type MysqlStatusCallback = (configurations: {host, port, user, name}) => void
@@ -101,9 +102,9 @@ export class MysqlConnector extends Service {
     return this.params.get(DB_NAME) as string;
   }
 
-  async exec(query: string, data?: any[]) {
+  async exec(sql: string, data?: any[], nested?: boolean) {
     return new Promise<any>((resolve, reject) => {
-      this.connection!.query(query, data || [], (err, result, fields) => {
+      this.connection!.query({sql, nestTables: nested === true}, data || [], (err, result, fields) => {
         if (err) {
           reject(new MysqlCoreError(`${err}`));
         } else {
@@ -114,6 +115,6 @@ export class MysqlConnector extends Service {
   }
 
   async run(query: MysqlQuery) {
-    return this.exec(query.query, query.params)
+    return this.exec(query.sql, query.params, query.nested)
   }
 }

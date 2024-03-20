@@ -348,8 +348,8 @@ export class MysqlEntity {
 
     let columns = (this.constructor as any).getColumns()
     let table = (this.constructor as any).getTableName()
-    let ins: MysqlQuery = {query: "", params: []}
-    ins.query = `INSERT INTO \`${table}\` (`
+    let ins: MysqlQuery = {sql: "", params: []}
+    ins.sql = `INSERT INTO \`${table}\` (`
     let qparams = `VALUES (`
     let isFirst = true
     let pk: MysqlEntityParameter
@@ -362,21 +362,21 @@ export class MysqlEntity {
       if (isFirst) {
         isFirst = false
       } else {
-        ins.query += ", "
+        ins.sql += ", "
         qparams += ", "
       }
-      ins.query += `\`${column.columnName}\``
+      ins.sql += `\`${column.columnName}\``
       qparams += "?"
       ins.params.push(this[column.name])
     }
-    ins.query += `) ${qparams});`
+    ins.sql += `) ${qparams});`
 
     if (db == null) {
       return ins
     } else {
       let result = await db.run(ins)
-      this[pk.name] = result.insertId
-      return result.insertId
+      this[pk.name] = result.result.insertId
+      return result.result.insertId
     }
   }
 
@@ -388,8 +388,8 @@ export class MysqlEntity {
 
     let columns = (this.constructor as any).getColumns()
     let table = (this.constructor as any).getTableName()
-    let upt: MysqlQuery = {query: "", params: []}
-    upt.query = `UPDATE \`${table}\` SET `
+    let upt: MysqlQuery = {sql: "", params: []}
+    upt.sql = `UPDATE \`${table}\` SET `
     let isFirst = true
     let pk: MysqlEntityParameter
     for (let column of columns) {
@@ -401,27 +401,27 @@ export class MysqlEntity {
       if (isFirst) {
         isFirst = false
       } else {
-        upt.query += ", "
+        upt.sql += ", "
       }
-      upt.query += `\`${column.columnName}\` = ?`
+      upt.sql += `\`${column.columnName}\` = ?`
       upt.params.push(this[column.name])
     }
-    upt.query += ` WHERE \`${pk.columnName}\` = ?;`
+    upt.sql += ` WHERE \`${pk.columnName}\` = ?;`
     upt.params.push(this[pk.name])
 
     if (db == null) {
       return upt
     } else {
       let result = await db.run(upt)
-      return result.changedRows
+      return result.result.changedRows
     }
   }
 
   async remove(db: MysqlConnector) {
     let columns = (this.constructor as any).getColumns()
     let table = (this.constructor as any).getTableName()
-    let rmv: MysqlQuery = {query: "", params: []}
-    rmv.query = `DELETE FROM \`${table}\` WHERE `
+    let rmv: MysqlQuery = {sql: "", params: []}
+    rmv.sql = `DELETE FROM \`${table}\` WHERE `
     let pk: MysqlEntityParameter
     for (let column of columns) {
       if (column.primaryKey) {
@@ -431,7 +431,7 @@ export class MysqlEntity {
     }
     
     if (pk != null && this[pk.name] != null) {
-      rmv.query += `\`${pk.columnName}\` = ?;`
+      rmv.sql += `\`${pk.columnName}\` = ?;`
       rmv.params.push(this[pk.name])
     } else {
       let err = {}
@@ -443,7 +443,7 @@ export class MysqlEntity {
       return rmv
     } else {
       let result = await db.run(rmv)
-      return result.affectedRows
+      return result.result.affectedRows
     }
   }
 
