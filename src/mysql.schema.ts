@@ -2,6 +2,7 @@ import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
 import { MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
+import { MysqlCountOptions, MysqlFindOneOptions, MysqlFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 
 
 export enum MysqlDataType {
@@ -37,7 +38,7 @@ export enum MysqlValidationError {
   MIN_LENGTH = "MIN_LENGTH"
 }
 
-interface MysqlEntityParameter {
+export interface MysqlEntityParameter {
   name: string
   type: MysqlDataType
   default: any,
@@ -79,20 +80,51 @@ interface MysqlEntityOptions {
   readColumn: boolean
 }
 
+interface MysqlEntityInsert {
+  rewriteTable?: string
+}
+
+interface MysqlEntityUpdate {
+  rewriteTable?: string
+}
+
+interface MysqlEntityRemove {
+  rewriteTable?: string
+}
+
+export enum MysqlAssociationType {
+  BELONGS_TO = "BELONGS_TO",
+  BELONGS_TO_MANY = "BELONGS_TO_MANY",
+  HAS_ONE = "HAS_ONE",
+  HAS_MANY = "HAS_MANY",
+}
+
+interface MysqlEntityAssociation {
+  type: MysqlAssociationType
+  entity: typeof MysqlEntity
+  entityName: string
+  foreignKey?: string
+  through?: typeof MysqlEntity
+}
+
 export class MysqlEntity {
   static getTableName() {
     return this.name
   }
 
-  static getPrimaryKey() {
+  static getPrimaryKey(): string | null {
     return null
   }
 
   static getColumns() {
-    return []
+    return [] as MysqlEntityParameter[]
   }
 
-  static DefineSchema(table: string, columns: {[column:string]: MysqlEntityColumn | MysqlDataType}, associations?: any[]) {
+  static getAssociations() {
+    return [] as MysqlEntityAssociation[]
+  }
+
+  static DefineSchema(table: string, columns: {[column:string]: MysqlEntityColumn | MysqlDataType}) {
     this.getTableName = () => {
       return table
     }
@@ -340,14 +372,94 @@ export class MysqlEntity {
     }
   }
 
-  async insert(db: MysqlConnector) {
-    let errors = await this.validate(db, true)
+  static hasOne(entity: typeof MysqlEntity, foreignKey: string, custom?: string) {
+    let table = entity.getTableName()
+    let name = table.charAt(0).toLowerCase() + table.slice(1)
+    let association: MysqlEntityAssociation = {
+      type: MysqlAssociationType.HAS_ONE,
+      entity,
+      entityName: custom || name,
+      foreignKey
+    }
+    let current = this.getAssociations()
+    current.push(association)
+    this.getAssociations = () => { return current }
+  }
+
+  static hasMany(entity: typeof MysqlEntity, foreignKey: string, custom?: string) {
+    let table = entity.getTableName()
+    let name = table.charAt(0).toLowerCase() + table.slice(1)
+    let association: MysqlEntityAssociation = {
+      type: MysqlAssociationType.HAS_MANY,
+      entity,
+      entityName: custom || name,
+      foreignKey
+    }
+    let current = this.getAssociations()
+    current.push(association)
+    this.getAssociations = () => { return current }
+  }
+
+  static belongsTo(entity: typeof MysqlEntity, foreignKey: string, custom?: string) {
+    let table = entity.getTableName()
+    let name = table.charAt(0).toLowerCase() + table.slice(1)
+    let association: MysqlEntityAssociation = {
+      type: MysqlAssociationType.BELONGS_TO,
+      entity,
+      entityName: custom || name,
+      foreignKey: foreignKey
+    }
+    let current = this.getAssociations()
+    current.push(association)
+    this.getAssociations = () => { return current }
+  }
+
+  static belongsToMany(entity: typeof MysqlEntity, through: typeof MysqlEntity, foreignKey: string, custom?: string) {
+    let table = entity.getTableName()
+    let name = table.charAt(0).toLowerCase() + table.slice(1)
+    let association: MysqlEntityAssociation = {
+      type: MysqlAssociationType.BELONGS_TO,
+      entity,
+      entityName: custom || name,
+      foreignKey: foreignKey,
+      through
+    }
+    let current = this.getAssociations()
+    current.push(association)
+    this.getAssociations = () => { return current }
+  }
+
+  async populate(db: MysqlConnector) {
+    let associations = (this.constructor as any).getAssociations()
+    let pk = (this.constructor as any).getPrimaryKey() || "id"
+  
+    for await (let association of associations) {
+      let w: any = {}
+      if (association.type == MysqlAssociationType.HAS_MANY || association.type == MysqlAssociationType.HAS_ONE) {
+        w[association.foreignKey] = this[pk]
+      } else if (association.type == MysqlAssociationType.BELONGS_TO) {
+        let remotePk = association.entity.getPrimaryKey() || "id"
+        w[remotePk] = this[association.foreignKey]
+      } else {
+        // TODO for many to many
+        
+      }
+      
+      let entity = await association.entity.FindOne(db, w)
+      this[association.entityName] = entity
+    }
+  }
+
+  async insert(db: MysqlConnector, options?: MysqlEntityInsert) {
+    let errors = await this.validate(db, {insert: true})
     if (Object.keys(errors).length > 0) {
       throw new MysqlEntityValidationError("Some errors were found in the entity", errors)
     }
 
+    let loptions = options || {}
+
     let columns = (this.constructor as any).getColumns()
-    let table = (this.constructor as any).getTableName()
+    let table = loptions.rewriteTable != null ? loptions.rewriteTable : (this.constructor as any).getTableName()
     let ins: MysqlQuery = {sql: "", params: []}
     ins.sql = `INSERT INTO \`${table}\` (`
     let qparams = `VALUES (`
@@ -380,14 +492,16 @@ export class MysqlEntity {
     }
   }
 
-  async update(db: MysqlConnector) {
+  async update(db: MysqlConnector, options?: MysqlEntityUpdate) {
     let errors = await this.validate(db)
     if (Object.keys(errors).length > 0) {
       throw new MysqlEntityValidationError("Some errors were found in the entity", errors)
     }
 
+    let loptions = options || {}
+
     let columns = (this.constructor as any).getColumns()
-    let table = (this.constructor as any).getTableName()
+    let table = loptions.rewriteTable != null ? loptions.rewriteTable : (this.constructor as any).getTableName()
     let upt: MysqlQuery = {sql: "", params: []}
     upt.sql = `UPDATE \`${table}\` SET `
     let isFirst = true
@@ -417,9 +531,11 @@ export class MysqlEntity {
     }
   }
 
-  async remove(db: MysqlConnector) {
+  async remove(db: MysqlConnector, options?: MysqlEntityRemove) {
+    let loptions = options || {}
+
     let columns = (this.constructor as any).getColumns()
-    let table = (this.constructor as any).getTableName()
+    let table = loptions.rewriteTable != null ? loptions.rewriteTable : (this.constructor as any).getTableName()
     let rmv: MysqlQuery = {sql: "", params: []}
     rmv.sql = `DELETE FROM \`${table}\` WHERE `
     let pk: MysqlEntityParameter
@@ -447,7 +563,7 @@ export class MysqlEntity {
     }
   }
 
-  async validate(db: MysqlConnector, insert: boolean = false) {
+  async validate(db: MysqlConnector, options: {insert: boolean} = {insert: false}) {
     let columns = (this.constructor as any).getColumns()
     let errors: any = {}
     for await (let column of columns) {
@@ -465,272 +581,193 @@ export class MysqlEntity {
       }
       if (errors[column.name] == null && column.unique === true) {
         // TODO
-      } else if (errors[column.name] == MysqlValidationError.REQUIRED && column.primaryKey == true && insert) {
+      } else if (errors[column.name] == MysqlValidationError.REQUIRED && column.primaryKey == true && options.insert) {
         // skip
         delete errors[column.name]
       }
     }
     return errors
   }
-}
 
+  static async Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlFindOptions) {
+    let wh = where || {}
+    let opt = options || {}
+    let columns = this.getColumns() as MysqlEntityParameter[]
+    let find: MysqlQuery = {sql: "", params: []}
+    let table = this.getTableName()
 
-
-
-
-
-
-
-/*
-export enum MysqlValidationError {
-  REQUIRED = "REQUIRED",
-  INVALID_TYPE = "INVALID_TYPE",
-  INVALID_VALUE = "INVALID_VALUE",
-  MIN_LENGTH = "MIN_LENGTH",
-  MAX_LENGTH = "MAX_LENGTH",
-  MIN_VALUE = "MIN_VALUE",
-  MAX_VALUE = "MAX_VALUE",
-  DUPLICATED = "DUPLICATED"
-}
-
-export enum MysqlDataType {
-  STRING = "STRING",
-  TEXT = "TEXT",
-  LONGTEXT = "LONGTEXT",
-  INTEGER = "INTEGER",
-  BIGINT = "BIGINT",
-  DECIMAL = "DECIMAL",
-  DATE = "DATE",
-  DATETIME = "DATETIME",
-  TIME = "TIME",
-  BOOLEAN = "BOOLEAN"
-}
-
-interface MysqlSchemaColumn {
-  name: string
-  type: MysqlDataType
-  size?: number
-  default?: any
-  primaryKey: boolean
-  autoIncrement: boolean
-  nullable: boolean
-}
-
-interface MysqlColumnDefinition {
-  name: string
-  column?: string
-  type: MysqlDataType
-  nullable: boolean
-  default?: any
-}
-
-interface MysqlColumnStringDefinition extends MysqlColumnDefinition {
-  type: MysqlDataType.STRING | MysqlDataType.TEXT | MysqlDataType.LONGTEXT
-  default?: string
-  size?: number
-  primaryKey?: boolean
-  unique?: boolean
-  minLength?: number
-  maxLength?: number
-  validation?: (data: string) => boolean
-}
-
-interface MysqlColumnIntegerDefinition extends MysqlColumnDefinition {
-  type: MysqlDataType.INTEGER | MysqlDataType.BIGINT
-  default?: number
-  size?: number
-  primaryKey?: boolean
-  autoIncrement?: boolean
-  min?: number
-  max?: number
-  validation?: (data: string) => boolean
-}
-
-/
-
-enum MysqlDataValidationError {
-
-}
-
-
-
-enum MysqlRelation {
-  BELONGS_TO_MANY = "BELONGS_TO_MANY",
-  BELONGS_TO = "BELONGS_TO",
-  HAS_MANY = "HAS_MANY",
-  HAS_ONE = "HAS_ONE"
-}
-
-interface MysqlEntityRelationDefinition {
-  type: MysqlRelation
-
-}
-
-class MysqlEntityDefinition {
-  table: string
-  tableAlias?: string
-  columns: MysqlEntityColumnDefinition[]
-  relations: []
-} *
-
-
-
-export class MysqlEntity {
-  // Schema helpers
-  static getTableName() {
-    return this.name
-  }
-  /static getSchemaDefinition(): MysqlEntityColumn[] {
-    throw new MysqlCoreError(`Need to define the Entity's schema for the class ${this.name}.`)
-  }
-  static getPrimaryKey(): MysqlEntityColumn {
-    throw new MysqlCoreError(`Need to define the Entity's schema for the class ${this.name}.`)
-  }
-  static getValidators() {}
-  static getRelations() {}/
-  
-  // Schema definitions
-  static DefineSchema(table: string, columns: (MysqlColumnStringDefinition | MysqlColumnIntegerDefinition)[]) {
-    // table
-    this.getTableName = () => {return table}
-
-    // schema
-    let shema: MysqlSchemaColumn[] = []
-    let primaryKey: MysqlSchemaColumn
-
-    // validators
-    let validators: {name: string, validations: {validator: (data: any) => boolean, type: MysqlValidationError}[]}
-
-    // setters
-
-    // columns
-    let cNames: string[] = []
-    let mNames: string[] = []
-
-    for (let column of columns) {
-      let currentColumn: MysqlSchemaColumn
-
-      if (mNames.indexOf(column.name) > -1) {
-        throw new MysqlCoreError(`Duplicated variable name: ${column.name}`)
-      } else if ((column.column != null && cNames.indexOf(column.column) > -1) || (column.column == null && cNames.indexOf(column.name) > -1)) {
-        throw new MysqlCoreError(`Duplicated column name: ${column.column != null ? column.column : column.name}`)
+    let select: MysqlQuery = {sql: "", params: []}
+    if (opt.select == null || opt.select.length == 0) {
+      let isFirst = true
+      for (let column of columns) {
+        if (isFirst) {
+          select.sql += "SELECT "
+          isFirst = false
+        } else {
+          select.sql += ", "
+        }
+        select.sql += `\`${column.columnName}\``
       }
-      mNames.push(column.name)
-      column.column != null ? cNames.push(column.column) : cNames.push(column.name)
+    } else {
+      select = qselect(opt.select || [])
+    }
+    find.sql += `${select.sql} FROM \`${table}\``
+    find.params.push(...select.params)
 
-      // types
-      if (column.type == MysqlDataType.STRING || column.type == MysqlDataType.TEXT || column.type == MysqlDataType.LONGTEXT) {
-        let c = column as MysqlColumnStringDefinition
-        currentColumn = {
-          name: c.column != null ? c.column : c.name,
-          type: c.type,
-          size: c.size,
-          default: c.default,
-          primaryKey: c.primaryKey === true,
-          autoIncrement: false,
-          nullable: c.nullable === true
-        }
-        shema.push(currentColumn)
+    // join
 
-        // PK
-        if (c.primaryKey === true) {
-          primaryKey = currentColumn
-        }
+    let w: MysqlQuery = {sql: "", params: []}
+    if (Object.keys(wh).length > 0) {
+      w = qwhere(wh, false)
+    }
+    find.sql += w.sql
+    find.params.push(...w.params)
 
-        // validations
-        let v: {validator: (data: any) => boolean, type: MysqlValidationError}[] = []
-        v.push({type: MysqlValidationError.INVALID_TYPE, validator: (data: any) => {
-          return typeof data == "string" || data === undefined || data === null
-        }})
-        if (c.nullable === false) {
-          v.push({type: MysqlValidationError.REQUIRED, validator: (data: string) => {
-            return data !== undefined && data !== null
-          }})
-        }
-        if (c.minLength !== undefined) {
-          v.push({type: MysqlValidationError.MIN_LENGTH, validator: (data: string) => {
-            return data.length >= c.minLength
-          }})
-        }
-        if (c.maxLength !== undefined) {
-          v.push({type: MysqlValidationError.MAX_LENGTH, validator: (data: string) => {
-            return data.length <= c.maxLength
-          }})
-        }
-        //if (c.unique === true) {
-        //  v.push({type: MysqlValidationError.DUPLICATED, validator: (data: string) => {
-        //    return data.length <= c.maxLength
-        //  }})
-        //}
-        if (c.validation != null) {
-          v.push({type: MysqlValidationError.INVALID_VALUE, validator: c.validation})
-        }
+    let group: MysqlQuery = {sql: "", params: []}
+    if (opt.groupBy != null && opt.groupBy.length > 0) {
+      group = qgroupby(opt.groupBy)
+    }
+    find.sql += group.sql
+    find.params.push(...group.params)
 
-        validators[column.name] = v
+    let order: MysqlQuery = {sql: "", params: []}
+    if (opt.orderBy != null && opt.orderBy.length > 0) {
+      order = qorderby(opt.orderBy)
+    }
+    find.sql += order.sql
+    find.params.push(...order.params)
 
-      } else if (column.type == MysqlDataType.INTEGER || column.type == MysqlDataType.BIGINT) {
-        let c = column as MysqlColumnIntegerDefinition
-        currentColumn = {
-          name: c.column != null ? c.column : c.name,
-          type: c.type,
-          size: c.size,
-          default: c.default,
-          primaryKey: c.primaryKey === true,
-          autoIncrement: c.autoIncrement === true,
-          nullable: c.nullable === true
-        }
-        shema.push(currentColumn)
+    let limit: MysqlQuery = {sql: "", params: []}
+    if (opt.limit != null) {
+      limit = qlimit(opt.limit.per, opt.limit.page)
+    } else {
+      limit = qlimit(1000, 1)
+    }
+    find.sql += `${limit.sql};`
+    find.params.push(...limit.params)
 
-        if (c.primaryKey === true) {
-          primaryKey = currentColumn
-        }
+    if (db == null) {
+      return [find]
+    } else {
+      let results = await db.exec(find.sql, find.params, true)
+      let list = []
+      for (let result of results) {
+        let entity = this.constructor(result[table], {readColumn: true})
+        list.push(entity)
+      }
+      return list
+    }
+  }
 
-        // validations
-        let v: {validator: (data: any) => boolean, type: MysqlValidationError}[] = []
-        v.push({type: MysqlValidationError.INVALID_TYPE, validator: (data: any) => {
-          return typeof data == "number" || data === undefined || data === null
-        }})
-        if (c.nullable === false) {
-          v.push({type: MysqlValidationError.REQUIRED, validator: (data: string) => {
-            return data !== undefined && data !== null
-          }})
-        }
-        if (c.min !== undefined) {
-          v.push({type: MysqlValidationError.MIN_VALUE, validator: (data: string) => {
-            return data.length >= c.min
-          }})
-        }
-        if (c.max !== undefined) {
-          v.push({type: MysqlValidationError.MAX_VALUE, validator: (data: string) => {
-            return data.length <= c.max
-          }})
-        }
-        //if (c.unique === true) {
-        //  v.push({type: MysqlValidationError.DUPLICATED, validator: (data: string) => {
-        //    return data.length <= c.maxLength
-        //  }})
-        //}
-        if (c.validation != null) {
-          v.push({type: MysqlValidationError.INVALID_VALUE, validator: c.validation})
-        }
+  static async FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlFindOneOptions) {
+    let wh = where || {}
+    let opt = options || {}
+    let columns = this.getColumns() as MysqlEntityParameter[]
+    let find: MysqlQuery = {sql: "", params: []}
+    let table = this.getTableName()
 
-        validators[column.name] = v
-        
+    let select: MysqlQuery = {sql: "", params: []}
+    if (opt.select == null || opt.select.length == 0) {
+      let isFirst = true
+      for (let column of columns) {
+        if (isFirst) {
+          select.sql += "SELECT "
+          isFirst = false
+        } else {
+          select.sql += ", "
+        }
+        select.sql += `\`${column.columnName}\``
+      }
+    } else {
+      select = qselect(opt.select || [])
+    }
+    find.sql += `${select.sql} FROM \`${table}\``
+    find.params.push(...select.params)
+
+    // join
+
+    let w: MysqlQuery = {sql: "", params: []}
+    if (Object.keys(wh).length > 0) {
+      w = qwhere(wh, false)
+    }
+    find.sql += w.sql
+    find.params.push(...w.params)
+
+    let group: MysqlQuery = {sql: "", params: []}
+    if (opt.groupBy != null && opt.groupBy.length > 0) {
+      group = qgroupby(opt.groupBy)
+    }
+    find.sql += group.sql
+    find.params.push(...group.params)
+
+    let order: MysqlQuery = {sql: "", params: []}
+    if (opt.orderBy != null && opt.orderBy.length > 0) {
+      order = qorderby(opt.orderBy)
+    }
+    find.sql += order.sql
+    find.params.push(...order.params)
+
+    let limit = qlimit(1, 1)
+    find.sql += `${limit.sql};`
+    find.params.push(...limit.params)
+
+    if (db == null) {
+      return find
+    } else {
+      let results = await db.exec(find.sql, find.params, true)
+      if (results.length > 0) {
+        return this.constructor(results[0][table], {readColumn: true})
+      } else {
+        return null
       }
     }
   }
 
-  // CRUD class
-  static Find() {}
-  static FindOne() {}
-  static Count() {}
-  static UpdateAll() {}
-  static RemoveAll() {}
+  static async Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlCountOptions) {
+    let wh = where || {}
+    let opt = options || {}
+    let columns = this.getColumns() as MysqlEntityParameter[]
+    
+    let find: MysqlQuery = {sql: "", params: []}
+    let table = this.getTableName()
 
-  // CRUD instance
-  insert() {}
-  update() {}
-  remove() {}
+    let pk = this.getPrimaryKey()
+    let pkC = columns.find(c => c.name == pk)
+    if (pkC != null) {
+      pk = pkC.columnName
+    }
+
+    let select = qselect([{column: pk, as: "total", operator: MysqlOperator.COUNT}])
+    find.sql += `${select.sql} FROM \`${table}\``
+    find.params.push(...select.params)
+
+    // join
+
+    let w: MysqlQuery = {sql: "", params: []}
+    if (Object.keys(wh).length > 0) {
+      w = qwhere(wh, false)
+    }
+    find.sql += w.sql
+    find.params.push(...w.params)
+
+    let group: MysqlQuery = {sql: "", params: []}
+    if (opt.groupBy != null && opt.groupBy.length > 0) {
+      group = qgroupby(opt.groupBy)
+    }
+    find.sql += group.sql
+    find.params.push(...group.params)
+
+    find.sql += `;`
+
+    if (db == null) {
+      return find
+    } else {
+      let results = await db.exec(find.sql, find.params, true)
+      if (results.length > 0) {
+        return results[0][table].total as number
+      } else {
+        return 0
+      }
+    }
+  }
 }
-
-*/

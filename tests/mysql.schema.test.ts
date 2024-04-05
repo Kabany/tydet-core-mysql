@@ -1,5 +1,7 @@
 import { MysqlEntityValidationError } from "../src/mysql.error"
+import { QueryCount, QueryFind, QueryFindOne } from "../src/mysql.query"
 import { MysqlDataType, MysqlEntity } from "../src/mysql.schema"
+import { MysqlQuery } from "../src/mysql.service"
 
 
 
@@ -129,6 +131,59 @@ describe("Mysql Schema", () => {
         expect(err.errors.lastName).toBeUndefined()
         expect(err.errors.id).toBe("REQUIRED")
       }
+    })
+    it("Entity Find query", async () => {
+      let result = await User.Find(null as any, {name: "Luis"})
+      let query = result[0]
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT `id`, `firstName`, `lastName`, `email` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Entity FindOne query", async () => {
+      let result = await User.FindOne(null as any, {name: "Luis"})
+      let query = result
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT `id`, `firstName`, `lastName`, `email` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Entity Count query", async () => {
+      let result = await User.Count(null as any, {name: "Luis"})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(1)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.sql).toBe("SELECT COUNT(`id`) AS `total` FROM `users` WHERE `name` = ?;")
+    })
+  })
+
+  describe("MysqlEntity query methods", () => {
+    it("QueryFind", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("QueryFindOne", async () => {
+      let result = await QueryFindOne(null as any, "users", {name: "Luis"})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("QueryCount", async () => {
+      let result = await QueryCount(null as any, "users", {name: "Luis"})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(1)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.sql).toBe("SELECT COUNT(*) AS `total` FROM `users` WHERE `name` = ?;")
     })
   })
 

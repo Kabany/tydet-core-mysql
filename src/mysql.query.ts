@@ -1,6 +1,6 @@
 import { MysqlCoreError } from "./mysql.error"
-import { MysqlDataType } from "./mysql.schema"
-import { MysqlQuery } from "./mysql.service"
+import { MysqlDataType, MysqlEntityParameter } from "./mysql.schema"
+import { MysqlConnector, MysqlQuery } from "./mysql.service"
 
 
 // Table operations
@@ -256,3 +256,411 @@ export function AlterTable(table: string) {
 
 // CRUD operations
 
+export enum MysqlOperator {
+  COUNT = "COUNT"
+}
+
+export interface MysqlSelectOptions {
+  column: string
+  as?: string
+  operator?: MysqlOperator
+}
+
+export interface MysqlFindOptions {
+  select?: (string | MysqlSelectOptions)[]
+  groupBy?: string[]
+  orderBy?: MysqlOrderOptions[]
+  limit?: {page: number, per: number}
+}
+
+export function qselect(columns: (string | MysqlSelectOptions)[]) {
+  let query: MysqlQuery = {sql: "SELECT ", params: []}
+  if (columns == null || columns.length == 0) {
+    query.sql += "*"
+  } else {
+    let isFirst = true
+    for (let column of columns) {
+      if (isFirst) {
+        isFirst = false
+      } else {
+        query.sql += ", "
+      }
+      
+      if (typeof column == "string") {
+        query.sql += `\`${column}\``
+      } else if (typeof column == "object") {
+        if (column.operator != null) {
+          if (["*"].indexOf(column.column) > -1) {
+            query.sql += `${column.operator}(${column.column})${column.as != null ? (" AS `" + column.as + "`") : ""}`
+          } else {
+            query.sql += `${column.operator}(\`${column.column}\`)${column.as != null ? (" AS `" + column.as + "`") : ""}`
+          }
+        } else {
+          query.sql += `\`${column.column}\`${column.as != null ? (" AS `" + column.as + "`") : ""}`
+        }
+      }
+    }
+  }
+  return query
+}
+
+
+
+export interface MysqlWhereOptions {
+  [column:string]: any
+}
+
+function qwhereParams(key: string, obj: any): MysqlQuery {
+  let data: MysqlQuery = {sql: "", params: []};
+
+  if (obj["$eq"] !== undefined) {
+    data.sql = `\`${key}\` = ?`;
+    data.params.push(obj["$eq"]);
+  } else if (obj["$neq"] !== undefined) {
+    data.sql = `\`${key}\` <> ?`;
+    data.params.push(obj["$neq"]);
+  } else if (obj["$gt"] !== undefined) {
+    data.sql = `\`${key}\` > ?`;
+    data.params.push(obj["$gt"]);
+  } else if (obj["$gte"] !== undefined) {
+    data.sql = `\`${key}\` >= ?`;
+    data.params.push(obj["$gte"]);
+  } else if (obj["$lt"] !== undefined) {
+    data.sql = `\`${key}\` < ?`;
+    data.params.push(obj["$lt"]);
+  } else if (obj["$lte"] !== undefined) {
+    data.sql = `\`${key}\` <= ?`;
+    data.params.push(obj["$lte"]);
+  } else if (obj["$is"] !== undefined) {
+    data.sql = `\`${key}\` is ?`;
+    data.params.push(obj["$is"]);
+  } else if (obj["$not"] !== undefined) {
+    data.sql = `\`${key}\` is not ?`;
+    data.params.push(obj["$not"]);
+  } else if (obj["$between"] !== undefined) {
+    data.sql = `(\`${key}\` BETWEEN ? AND ?)`;
+    data.params.push(obj["$between"]["$from"], obj["$between"]["$to"]);
+  } else if (obj["$nbetween"] !== undefined) {
+    data.sql = `(\`${key}\` NOT BETWEEN ? AND ?)`;
+    data.params.push(obj["$nbetween"]["$from"], obj["$nbetween"]["$to"]);
+  } else if (obj["$in"] !== undefined) {
+    data.sql = `\`${key}\` IN (?)`;
+    data.params.push(obj["$in"]);
+  } else if (obj["$nin"] !== undefined) {
+    data.sql = `\`${key}\` NOT IN (?)`;
+    data.params.push(obj["$nin"]);
+  } else {
+    data.sql = `\`${key}\` = ?`;
+    data.params.push(obj);
+  }
+
+  return data;
+}
+
+export function qwhere(where: MysqlWhereOptions, _subquery: boolean = false): MysqlQuery {
+  let data: MysqlQuery = {sql: "", params: []};
+
+  let keys = Object.keys(where);
+  if (keys.length) {
+    let isFirst = true;
+    if (_subquery) {
+      data.sql += "(";
+    }
+    for (let key of keys) {
+      switch(key) {
+        case "$and":
+          if (isFirst) {
+            isFirst = false;
+            if (!_subquery) {
+              data.sql += " WHERE ";
+            }
+          } else {
+            data.sql += " AND ";
+          }
+          let and = qwhere(where[key] || {}, true);
+          data.sql += and.sql;
+          data.params.push(...and.params);
+          break;
+        case "$or":
+          let needClose = false;
+          let orFirst = true;
+          let orOptions = where[key] || [];
+          if (isFirst) {
+            isFirst = false;
+            if (!_subquery) {
+              data.sql += " WHERE ";
+            }
+          } else {
+            data.sql += " AND (";
+            needClose = true;
+          }
+          for (let opt of orOptions) {
+            let and = qwhere(opt, true);
+            if (orFirst) {
+              orFirst = false;
+            } else {
+              data.sql += " OR ";
+            }
+            data.sql += and.sql;
+            data.params.push(...and.params);
+          }
+          if (needClose) {
+            data.sql += ")";
+          }
+          break;
+        default:
+          if (isFirst) {
+            isFirst = false;
+            if (!_subquery) {
+              data.sql += " WHERE ";
+            }
+          } else {
+            data.sql += " AND ";
+          }
+          let type = typeof where[key]
+          let k = key.startsWith("$t")
+          // resolve table name
+          if (where[key] === null || where[key] === undefined) {
+            data.sql += `\`${key}\` IS NULL`;
+          } else if (type == "object") {
+            let c = qwhereParams(key, where[key])
+            data.sql += c.sql;
+            data.params.push(...c.params)
+          } else {
+            data.sql += `\`${key}\` = ?`;
+            data.params.push(where[key]);
+          }
+          break;
+      }
+    }
+  }
+  if (_subquery) {
+    data.sql += ")";
+  }
+  
+  return data;
+}
+
+export function qgroupby(groups?: string[]) {
+  let query: MysqlQuery = {sql: "", params: []};
+  let isFirst = true;
+  if (groups != null && groups.length > 0) {
+    for (let item of groups) {
+      if (isFirst) {
+        query.sql += " GROUP BY ";
+        isFirst = false;
+      } else {
+        query.sql += ", ";
+      }
+      query.sql += item;
+    }
+  }
+  return query;
+}
+
+export interface MysqlOrderOptions {
+  column: string
+  order: "DESC" | "ASC"
+}
+
+export function qorderby(options?: MysqlOrderOptions[]) {
+  let query: MysqlQuery = {sql: "", params: []}
+  let isFirst = true;
+  if (options != null) {
+    let keys = Object.keys(options);
+    for (let key of keys) {
+      if (isFirst) {
+        query.sql += " ORDER BY "
+        isFirst = false
+      } else {
+        query.sql += ", "
+      }
+      query.sql += `${key} ${options[key]}`
+    }
+  }
+  return query;
+}
+
+export function qlimit(per = 100, page = 1): MysqlQuery {
+  let data: MysqlQuery = {sql: " LIMIT ? OFFSET ?", params: [per, (per * (page - 1))]}
+  return data;
+}
+
+export interface MysqlFindOneOptions {
+  select?: (string | MysqlSelectOptions)[]
+  groupBy?: string[]
+  orderBy?: MysqlOrderOptions[]
+}
+
+export interface MysqlCountOptions {
+  groupBy?: string[]
+}
+
+
+
+
+
+
+
+
+export interface MysqlTableOptions {
+  table: string
+  as?: string
+}
+
+export async function QueryFind(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOptions) {
+  let wh = where || {}
+  let opt = options || {}
+  let find: MysqlQuery = {sql: "", params: []}
+
+  let select: MysqlQuery = {sql: "", params: []}
+  select = qselect(opt.select || [])
+  find.sql += `${select.sql}`
+  if (typeof table == "string") {
+    find.sql += ` FROM \`${table}\``
+  } else if (typeof table == "object") {
+    find.sql += ` FROM \`${table.table}\`${table.as != null ? (" AS `" + table.as + "`") : ""}`
+  }
+  find.params.push(...select.params)
+
+  // join
+
+  let w: MysqlQuery = {sql: "", params: []}
+  if (Object.keys(wh).length > 0) {
+    w = qwhere(wh, false)
+  }
+  find.sql += w.sql
+  find.params.push(...w.params)
+
+  let group: MysqlQuery = {sql: "", params: []}
+  if (opt.groupBy != null && opt.groupBy.length > 0) {
+    group = qgroupby(opt.groupBy)
+  }
+  find.sql += group.sql
+  find.params.push(...group.params)
+
+  let order: MysqlQuery = {sql: "", params: []}
+  if (opt.orderBy != null && opt.orderBy.length > 0) {
+    order = qorderby(opt.orderBy)
+  }
+  find.sql += order.sql
+  find.params.push(...order.params)
+
+  let limit: MysqlQuery = {sql: "", params: []}
+  if (opt.limit != null) {
+    limit = qlimit(opt.limit.per, opt.limit.page)
+  } else {
+    limit = qlimit(1000, 1)
+  }
+  find.sql += `${limit.sql};`
+  find.params.push(...limit.params)
+
+  if (db == null) {
+    return find
+  } else {
+    let results = await db.exec(find.sql, find.params, true)
+    return results
+  }
+}
+
+export async function QueryFindOne(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOneOptions) {
+  let wh = where || {}
+  let opt = options || {}
+  let find: MysqlQuery = {sql: "", params: []}
+
+  let select: MysqlQuery = {sql: "", params: []}
+  select = qselect(opt.select || [])
+  find.sql += `${select.sql}`
+  if (typeof table == "string") {
+    find.sql += ` FROM \`${table}\``
+  } else if (typeof table == "object") {
+    find.sql += ` FROM \`${table.table}\`${table.as != null ? (" AS `" + table.as + "`") : ""}`
+  }
+  find.params.push(...select.params)
+
+  // join
+
+  let w: MysqlQuery = {sql: "", params: []}
+  if (Object.keys(wh).length > 0) {
+    w = qwhere(wh, false)
+  }
+  find.sql += w.sql
+  find.params.push(...w.params)
+
+  let group: MysqlQuery = {sql: "", params: []}
+  if (opt.groupBy != null && opt.groupBy.length > 0) {
+    group = qgroupby(opt.groupBy)
+  }
+  find.sql += group.sql
+  find.params.push(...group.params)
+
+  let order: MysqlQuery = {sql: "", params: []}
+  if (opt.orderBy != null && opt.orderBy.length > 0) {
+    order = qorderby(opt.orderBy)
+  }
+  find.sql += order.sql
+  find.params.push(...order.params)
+
+  let limit = qlimit(1, 1)
+  find.sql += `${limit.sql};`
+  find.params.push(...limit.params)
+
+  if (db == null) {
+    return find
+  } else {
+    let results = await db.exec(find.sql, find.params, true)
+    if (results.length > 0) {
+      return results[0]
+    } else {
+      return null
+    }
+  }
+}
+
+export async function QueryCount(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlCountOptions) {
+  let wh = where || {}
+  let opt = options || {}
+  
+  let find: MysqlQuery = {sql: "", params: []}
+  let t: string
+
+  let select = qselect([{column: "*", as: "total", operator: MysqlOperator.COUNT}])
+  find.sql += `${select.sql}`
+  if (typeof table == "string") {
+    find.sql += ` FROM \`${table}\``
+    t = table
+  } else if (typeof table == "object") {
+    t = table.as
+    find.sql += ` FROM \`${table.table}\`${table.as != null ? (" AS `" + table.as + "`") : ""}`
+  }
+  find.params.push(...select.params)
+
+  // join
+
+  let w: MysqlQuery = {sql: "", params: []}
+  if (Object.keys(wh).length > 0) {
+    w = qwhere(wh, false)
+  }
+  find.sql += w.sql
+  find.params.push(...w.params)
+
+  let group: MysqlQuery = {sql: "", params: []}
+  if (opt.groupBy != null && opt.groupBy.length > 0) {
+    group = qgroupby(opt.groupBy)
+  }
+  find.sql += group.sql
+  find.params.push(...group.params)
+
+  find.sql += `;`
+
+  if (db == null) {
+    return find
+  } else {
+    let results = await db.exec(find.sql, find.params, true)
+    if (results.length > 0) {
+      return results[0][t].total as number
+    } else {
+      return 0
+    }
+  }
+}
