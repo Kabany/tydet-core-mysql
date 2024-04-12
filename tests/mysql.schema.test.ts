@@ -232,6 +232,33 @@ describe("Mysql Schema", () => {
       expect(query.params[6]).toBe(0)
       expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` IN (?) AND (`age` >= ?) AND (`age` <= ?) AND (`createdAt` BETWEEN ? AND ?) LIMIT ? OFFSET ?;")
     })
+    it("Query Group by options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {groupBy: ["status", {column: "role", table: "users"}]})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? GROUP BY `status`, `users`.`role` LIMIT ? OFFSET ?;")
+    })
+    it("Query Order by options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {orderBy: [{column: "lastName", order: "ASC"}, {column: "email", order: "ASC", table: "users"}]})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? ORDER BY `lastName` ASC, `users`.`email` ASC LIMIT ? OFFSET ?;")
+    })
+    it("Query Limit options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {limit: {page: 2, per: 10}})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(10)
+      expect(query.params[2]).toBe(10)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
   })
 
 })

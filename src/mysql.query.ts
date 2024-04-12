@@ -289,14 +289,14 @@ export interface MysqlJoinOptions {
 export interface MysqlFindOptions {
   select?: (string | MysqlSelectOptions)[]
   join?: MysqlJoinOptions[]
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
   limit?: {page: number, per: number}
 }
 
 export interface MysqlEntityFindOptions {
   select?: (string | MysqlSelectOptions)[]
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
   limit?: {page: number, per: number}
 }
@@ -518,7 +518,12 @@ export function qjoin(joins: MysqlJoinOptions[]) {
   return query
 }
 
-export function qgroupby(groups?: string[]) {
+export interface MysqlGroupOptions {
+  column: string
+  table?: string
+}
+
+export function qgroupby(groups?: (string | MysqlGroupOptions)[]) {
   let query: MysqlQuery = {sql: "", params: []};
   let isFirst = true;
   if (groups != null && groups.length > 0) {
@@ -529,7 +534,12 @@ export function qgroupby(groups?: string[]) {
       } else {
         query.sql += ", ";
       }
-      query.sql += item;
+      if (typeof item == "string") {
+        query.sql += `\`${item}\``;
+      } else {
+        let t = item.table != null ? `\`${item.table}\`.` : ""
+        query.sql += `${t}\`${item.column}\``;
+      }
     }
   }
   return query;
@@ -537,6 +547,7 @@ export function qgroupby(groups?: string[]) {
 
 export interface MysqlOrderOptions {
   column: string
+  table?: string
   order: "DESC" | "ASC"
 }
 
@@ -544,15 +555,15 @@ export function qorderby(options?: MysqlOrderOptions[]) {
   let query: MysqlQuery = {sql: "", params: []}
   let isFirst = true;
   if (options != null) {
-    let keys = Object.keys(options);
-    for (let key of keys) {
+    for (let item of options) {
       if (isFirst) {
         query.sql += " ORDER BY "
         isFirst = false
       } else {
         query.sql += ", "
       }
-      query.sql += `${key} ${options[key]}`
+      let t = item.table != null ? `\`${item.table}\`.` : ""
+      query.sql += `${t}\`${item.column}\` ${item.order}`
     }
   }
   return query;
@@ -566,25 +577,25 @@ export function qlimit(per = 100, page = 1): MysqlQuery {
 export interface MysqlFindOneOptions {
   select?: (string | MysqlSelectOptions)[]
   join?: MysqlJoinOptions[]
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
 }
 
 export interface MysqlEntityFindOneOptions {
   select?: (string | MysqlSelectOptions)[]
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
 }
 
 export interface MysqlCountOptions {
   countBy?: string
   join?: MysqlJoinOptions[]
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
 }
 
 export interface MysqlEntityCountOptions {
   countBy?: string
-  groupBy?: string[]
+  groupBy?: (string | MysqlGroupOptions)[]
 }
 
 
