@@ -2,7 +2,7 @@ import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
 import { MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
-import { MysqlCountOptions, MysqlFindOneOptions, MysqlFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
+import { MysqlCountOptions, MysqlEntityCountOptions, MysqlEntityFindOneOptions, MysqlEntityFindOptions, MysqlFindOneOptions, MysqlFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 
 
 export enum MysqlDataType {
@@ -589,7 +589,7 @@ export class MysqlEntity {
     return errors
   }
 
-  static async Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlFindOptions) {
+  static async Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOptions) {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -659,7 +659,7 @@ export class MysqlEntity {
     }
   }
 
-  static async FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlFindOneOptions) {
+  static async FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions) {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -723,7 +723,7 @@ export class MysqlEntity {
     }
   }
 
-  static async Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlCountOptions) {
+  static async Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityCountOptions) {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -732,9 +732,13 @@ export class MysqlEntity {
     let table = this.getTableName()
 
     let pk = this.getPrimaryKey()
-    let pkC = columns.find(c => c.name == pk)
-    if (pkC != null) {
-      pk = pkC.columnName
+    if (opt.countBy != null) {
+      pk = opt.countBy
+    } else {
+      let pkC = columns.find(c => c.name == pk)
+      if (pkC != null) {
+        pk = pkC.columnName
+      }
     }
 
     let select = qselect([{column: pk, as: "total", operator: MysqlOperator.COUNT}])

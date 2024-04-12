@@ -263,15 +263,45 @@ export enum MysqlOperator {
 export interface MysqlSelectOptions {
   column: string
   as?: string
+  table?: string
   operator?: MysqlOperator
 }
 
+export enum MysqlJoinType {
+  INNER = "INNER",
+  LEFT = "LEFT",
+  RIGHT = "RIGHT",
+  CROSS = "CROSS"
+}
+
+export interface MysqlJoinCondition {
+  column: string
+  table?: string
+}
+
+export interface MysqlJoinOptions {
+  table: string | MysqlTableOptions
+  type: MysqlJoinType
+  on: string | MysqlJoinCondition
+  with: string | MysqlJoinCondition
+}
+
 export interface MysqlFindOptions {
+  select?: (string | MysqlSelectOptions)[]
+  join?: MysqlJoinOptions[]
+  groupBy?: string[]
+  orderBy?: MysqlOrderOptions[]
+  limit?: {page: number, per: number}
+}
+
+export interface MysqlEntityFindOptions {
   select?: (string | MysqlSelectOptions)[]
   groupBy?: string[]
   orderBy?: MysqlOrderOptions[]
   limit?: {page: number, per: number}
 }
+
+
 
 export function qselect(columns: (string | MysqlSelectOptions)[]) {
   let query: MysqlQuery = {sql: "SELECT ", params: []}
@@ -289,14 +319,13 @@ export function qselect(columns: (string | MysqlSelectOptions)[]) {
       if (typeof column == "string") {
         query.sql += `\`${column}\``
       } else if (typeof column == "object") {
+        let pre = column.table != null ? `\`${column.table}\`.` : ""
         if (column.operator != null) {
-          if (["*"].indexOf(column.column) > -1) {
-            query.sql += `${column.operator}(${column.column})${column.as != null ? (" AS `" + column.as + "`") : ""}`
-          } else {
-            query.sql += `${column.operator}(\`${column.column}\`)${column.as != null ? (" AS `" + column.as + "`") : ""}`
-          }
+          let col = ["*"].indexOf(column.column) > -1 ? column.column : `\`${column.column}\``
+          query.sql += `${column.operator}(${pre}${col})${column.as != null ? (" AS `" + column.as + "`") : ""}`
         } else {
-          query.sql += `\`${column.column}\`${column.as != null ? (" AS `" + column.as + "`") : ""}`
+          let col = ["*"].indexOf(column.column) > -1 ? column.column : `\`${column.column}\``
+          query.sql += `${pre}${col}${column.as != null ? (" AS `" + column.as + "`") : ""}`
         }
       }
     }
@@ -369,17 +398,34 @@ export function qwhere(where: MysqlWhereOptions, _subquery: boolean = false): My
     for (let key of keys) {
       switch(key) {
         case "$and":
-          if (isFirst) {
-            isFirst = false;
-            if (!_subquery) {
-              data.sql += " WHERE ";
+          let and = where[key]
+          if (Array.isArray(and)) {
+            for (let opt of and) {
+              if (isFirst) {
+                isFirst = false;
+                if (!_subquery) {
+                  data.sql += " WHERE ";
+                }
+              } else {
+                data.sql += " AND ";
+              }
+              let andObj = qwhere(opt || {}, true);
+              data.sql += andObj.sql;
+              data.params.push(...andObj.params);
             }
           } else {
-            data.sql += " AND ";
+            if (isFirst) {
+              isFirst = false;
+              if (!_subquery) {
+                data.sql += " WHERE ";
+              }
+            } else {
+              data.sql += " AND ";
+            }
+            let andObj = qwhere(where[key] || {}, true);
+            data.sql += andObj.sql;
+            data.params.push(...andObj.params);
           }
-          let and = qwhere(where[key] || {}, true);
-          data.sql += and.sql;
-          data.params.push(...and.params);
           break;
         case "$or":
           let needClose = false;
@@ -441,6 +487,37 @@ export function qwhere(where: MysqlWhereOptions, _subquery: boolean = false): My
   return data;
 }
 
+export function qjoin(joins: MysqlJoinOptions[]) {
+  let query: MysqlQuery = {sql: "", params: []};
+  if (joins != null && joins.length) {
+    for (let join of joins) {
+      query.sql += ` ${join.type} JOIN `
+      if (typeof join.table == "string") {
+        query.sql += `\`${join.table}\``
+      } else if (typeof join.table == "object") {
+        query.sql += `\`${join.table.table}\`${join.table.as != null ? (" AS `" + join.table.as + "`") : ""}`
+      }
+      
+      let on = ""
+      if (typeof join.on == "string") {
+        on += `\`${join.on}\``
+      } else if (typeof join.on == "object") {
+        on += `\`${join.on.table}\`.\`${join.on.column}\``
+      }
+
+      let wit = ""
+      if (typeof join.with == "string") {
+        wit += `\`${join.with}\``
+      } else if (typeof join.with == "object") {
+        wit += `\`${join.with.table}\`.\`${join.with.column}\``
+      }
+
+      query.sql += ` ON ${on} = ${wit}`
+    }
+  }
+  return query
+}
+
 export function qgroupby(groups?: string[]) {
   let query: MysqlQuery = {sql: "", params: []};
   let isFirst = true;
@@ -488,11 +565,25 @@ export function qlimit(per = 100, page = 1): MysqlQuery {
 
 export interface MysqlFindOneOptions {
   select?: (string | MysqlSelectOptions)[]
+  join?: MysqlJoinOptions[]
+  groupBy?: string[]
+  orderBy?: MysqlOrderOptions[]
+}
+
+export interface MysqlEntityFindOneOptions {
+  select?: (string | MysqlSelectOptions)[]
   groupBy?: string[]
   orderBy?: MysqlOrderOptions[]
 }
 
 export interface MysqlCountOptions {
+  countBy?: string
+  join?: MysqlJoinOptions[]
+  groupBy?: string[]
+}
+
+export interface MysqlEntityCountOptions {
+  countBy?: string
   groupBy?: string[]
 }
 
@@ -523,7 +614,12 @@ export async function QueryFind(db: MysqlConnector, table: string | MysqlTableOp
   }
   find.params.push(...select.params)
 
-  // join
+  let join: MysqlQuery = {sql: "", params: []}
+  if (opt.join != null && opt.join.length > 0) {
+    join = qjoin(opt.join)
+  }
+  find.sql += join.sql
+  find.params.push(...join.params)
 
   let w: MysqlQuery = {sql: "", params: []}
   if (Object.keys(wh).length > 0) {
@@ -578,7 +674,12 @@ export async function QueryFindOne(db: MysqlConnector, table: string | MysqlTabl
   }
   find.params.push(...select.params)
 
-  // join
+  let join: MysqlQuery = {sql: "", params: []}
+  if (opt.join != null && opt.join.length > 0) {
+    join = qjoin(opt.join)
+  }
+  find.sql += join.sql
+  find.params.push(...join.params)
 
   let w: MysqlQuery = {sql: "", params: []}
   if (Object.keys(wh).length > 0) {
@@ -624,7 +725,8 @@ export async function QueryCount(db: MysqlConnector, table: string | MysqlTableO
   let find: MysqlQuery = {sql: "", params: []}
   let t: string
 
-  let select = qselect([{column: "*", as: "total", operator: MysqlOperator.COUNT}])
+  let c = opt.countBy != null ? opt.countBy : "*"
+  let select = qselect([{column: c, as: "total", operator: MysqlOperator.COUNT}])
   find.sql += `${select.sql}`
   if (typeof table == "string") {
     find.sql += ` FROM \`${table}\``
@@ -635,7 +737,12 @@ export async function QueryCount(db: MysqlConnector, table: string | MysqlTableO
   }
   find.params.push(...select.params)
 
-  // join
+  let join: MysqlQuery = {sql: "", params: []}
+  if (opt.join != null && opt.join.length > 0) {
+    join = qjoin(opt.join)
+  }
+  find.sql += join.sql
+  find.params.push(...join.params)
 
   let w: MysqlQuery = {sql: "", params: []}
   if (Object.keys(wh).length > 0) {

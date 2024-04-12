@@ -1,5 +1,5 @@
 import { MysqlEntityValidationError } from "../src/mysql.error"
-import { QueryCount, QueryFind, QueryFindOne } from "../src/mysql.query"
+import { MysqlJoinType, QueryCount, QueryFind, QueryFindOne } from "../src/mysql.query"
 import { MysqlDataType, MysqlEntity } from "../src/mysql.schema"
 import { MysqlQuery } from "../src/mysql.service"
 
@@ -184,6 +184,53 @@ describe("Mysql Schema", () => {
       expect(query.params.length).toBe(1)
       expect(query.params[0]).toBe("Luis")
       expect(query.sql).toBe("SELECT COUNT(*) AS `total` FROM `users` WHERE `name` = ?;")
+    })
+    it("Query Select options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {select: ["id", "email", {column: "firstName", as: "name"}, {column: "lastName", table: "users"}]})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT `id`, `email`, `firstName` AS `name`, `users`.`lastName` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Query Join options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {join: [
+        {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
+      ]})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` INNER JOIN `comments` ON `users`.`id` = `userId` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Query Where options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis", $or: [{status: 1}, {status: 2, isDeleted: false}]})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(6)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1)
+      expect(query.params[2]).toBe(2)
+      expect(query.params[3]).toBeFalsy()
+      expect(query.params[4]).toBe(1000)
+      expect(query.params[5]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? AND ((`status` = ?) OR (`status` = ? AND `isDeleted` = ?)) LIMIT ? OFFSET ?;")
+    })
+    it("Query Where options 2", async () => {
+      let result = await QueryFind(null as any, "users", {name: {$in: ["Luis", "Bastidas"]}, $and: [{age: {$gte: 18}}, {age: {$lte: 65}}], createdAt: {$between: {$from: new Date("2024-01-01"), $to: new Date("2024-04-01")}}})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(7)
+      expect(query.params[0].length).toBe(2)
+      expect(query.params[0][0]).toBe("Luis")
+      expect(query.params[0][1]).toBe("Bastidas")
+      expect(query.params[1]).toBe(18)
+      expect(query.params[2]).toBe(65)
+      expect(query.params[3].toISOString()).toBe("2024-01-01T00:00:00.000Z")
+      expect(query.params[4].toISOString()).toBe("2024-04-01T00:00:00.000Z")
+      expect(query.params[5]).toBe(1000)
+      expect(query.params[6]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` IN (?) AND (`age` >= ?) AND (`age` <= ?) AND (`createdAt` BETWEEN ? AND ?) LIMIT ? OFFSET ?;")
     })
   })
 
