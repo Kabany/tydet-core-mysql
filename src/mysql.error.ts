@@ -2,12 +2,17 @@ import { CoreError } from "tydet-core";
 
 export class MysqlCoreError extends CoreError {
   name: string
+  sql: string
 
-  constructor(message?: string) {
+  constructor(message?: string, sql?: string) {
     super(message);
     this.name = "MysqlCoreError";
     this.message = message;
-    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+    this.sql = sql;
+    if (sql != null && message != null) {
+      this.message += `\nSQL Query: ${this.sql}`
+    }
+    this.stack = (new Error(this.message)).stack;  //`${this.message}\n${new Error().stack}`;
   }
 }
 

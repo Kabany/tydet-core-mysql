@@ -2,7 +2,7 @@ import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
 import { MysqlCoreError, MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
-import { MysqlCountOptions, MysqlEntityCountOptions, MysqlEntityFindOneOptions, MysqlEntityFindOptions, MysqlFindOneOptions, MysqlFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
+import { MysqlEntityCountOptions, MysqlEntityFindOneOptions, MysqlEntityFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 
 
 export enum MysqlDataType {
@@ -595,7 +595,7 @@ export class MysqlEntity {
     return errors
   }
 
-  static async Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOptions) {
+  static async Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOptions): Promise<any[]> {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -681,11 +681,11 @@ export class MysqlEntity {
     if (db == null) {
       return [find]
     } else {
-      let results = await db.exec(find.sql, find.params, true)
+      let data = await db.exec(find.sql, find.params, true)
       let list = []
       let holder: MysqlEntity
       let subholder: MysqlEntity[] = []
-      for (let result of results) {
+      for (let result of data.result) {
         if (join != null) {
           if (holder != null) {
             if (holder[pk] != result[table][pk]) {
@@ -711,14 +711,14 @@ export class MysqlEntity {
           }
 
           if (holder == null) {
-            holder = this.constructor(result[table], {readColumn: true})
+            holder = new this(result[table], {readColumn: true})
             if (result[join.entityName] != null) {
               let sub = new join.entity(result[join.entityName], {readColumn: true})
               subholder.push(sub)
             }
           }
         } else {
-          let entity = this.constructor(result[table], {readColumn: true})
+          let entity = new this(result[table], {readColumn: true})
           list.push(entity)
         }
       }
@@ -741,7 +741,7 @@ export class MysqlEntity {
     }
   }
 
-  static async FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions) {
+  static async FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions): Promise<any> {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -822,11 +822,11 @@ export class MysqlEntity {
     if (db == null) {
       return find
     } else {
-      let results = await db.exec(find.sql, find.params, true)
+      let data = await db.exec(find.sql, find.params, true)
       let list = []
       let holder: MysqlEntity
       let subholder: MysqlEntity[] = []
-      for (let result of results) {
+      for (let result of data.result) {
         if (join != null) {
           if (holder != null) {
             if (holder[pk] != result[table][pk]) {
@@ -852,14 +852,14 @@ export class MysqlEntity {
           }
 
           if (holder == null) {
-            holder = this.constructor(result[table], {readColumn: true})
+            holder = new this(result[table], {readColumn: true})
             if (result[join.entityName] != null) {
               let sub = new join.entity(result[join.entityName], {readColumn: true})
               subholder.push(sub)
             }
           }
         } else {
-          let entity = this.constructor(result[table], {readColumn: true})
+          let entity = new this(result[table], {readColumn: true})
           list.push(entity)
         }
       }
@@ -882,7 +882,7 @@ export class MysqlEntity {
     }
   }
 
-  static async Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityCountOptions) {
+  static async Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityCountOptions): Promise<number> {
     let wh = where || {}
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
@@ -921,11 +921,11 @@ export class MysqlEntity {
     find.sql += `;`
 
     if (db == null) {
-      return find
+      return find as any
     } else {
-      let results = await db.exec(find.sql, find.params, true)
-      if (results.length > 0) {
-        return results[0][table].total as number
+      let data = await db.exec(find.sql, find.params, true)
+      if (data.result.length > 0) {
+        return data.result[0][''].total as number
       } else {
         return 0
       }

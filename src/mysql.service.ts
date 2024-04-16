@@ -94,6 +94,10 @@ export class MysqlConnector extends Service {
     await super.beforeMount(context)
   }
 
+  override async onMount() {
+    await this.connect()
+  }
+
   override async beforeUnmount() {
     await this.disconnect()
   }
@@ -106,7 +110,9 @@ export class MysqlConnector extends Service {
     return new Promise<any>((resolve, reject) => {
       this.connection!.query({sql, nestTables: nested === true}, data || [], (err, result, fields) => {
         if (err) {
-          reject(new MysqlCoreError(`${err}`));
+          //console.log(err)
+          let sql = typeof err == "object" && err.sql != null ? err.sql : null
+          reject(new MysqlCoreError(`${err}`, sql));
         } else {
           resolve({result, fields});
         }

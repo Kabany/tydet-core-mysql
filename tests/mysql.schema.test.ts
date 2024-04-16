@@ -182,7 +182,7 @@ describe("Mysql Schema", () => {
       expect(query.sql).toBe("SELECT `id`, `firstName`, `lastName`, `email` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })
     it("Entity Count query", async () => {
-      let result = await User.Count(null as any, {name: "Luis"})
+      let result = await User.Count(null as any, {name: "Luis"}) as any
       let query = result as MysqlQuery
       expect(query.params.length).toBe(1)
       expect(query.params[0]).toBe("Luis")
@@ -205,109 +205,6 @@ describe("Mysql Schema", () => {
       expect(query.params[1]).toBe(1000)
       expect(query.params[2]).toBe(0)
       expect(query.sql).toBe("SELECT `users`.`id`, `users`.`firstName`, `users`.`lastName`, `users`.`email`, `comments`.`id`, `comments`.`userId`, `comments`.`message`, `comments`.`createdAt` FROM `users` INNER JOIN `comments` ON `users`.`id` = `comments`.`userId` WHERE `users`.`firstName` = ? LIMIT ? OFFSET ?;")
-    })
-  })
-
-  describe("MysqlEntity query methods", () => {
-    it("QueryFind", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1000)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
-    })
-    it("QueryFindOne", async () => {
-      let result = await QueryFindOne(null as any, "users", {name: "Luis"})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
-    })
-    it("QueryCount", async () => {
-      let result = await QueryCount(null as any, "users", {name: "Luis"})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(1)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.sql).toBe("SELECT COUNT(*) AS `total` FROM `users` WHERE `name` = ?;")
-    })
-    it("Query Select options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"}, {select: ["id", "email", {column: "firstName", as: "name"}, {column: "lastName", table: "users"}]})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1000)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT `id`, `email`, `firstName` AS `name`, `users`.`lastName` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
-    })
-    it("Query Join options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"}, {join: [
-        {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
-      ]})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1000)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` INNER JOIN `comments` ON `users`.`id` = `userId` WHERE `name` = ? LIMIT ? OFFSET ?;")
-    })
-    it("Query Where options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis", "$t.users.email": "email@test.com", $or: [{status: 1}, {status: 2, isDeleted: false}]})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(7)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe("email@test.com")
-      expect(query.params[2]).toBe(1)
-      expect(query.params[3]).toBe(2)
-      expect(query.params[4]).toBeFalsy()
-      expect(query.params[5]).toBe(1000)
-      expect(query.params[6]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? AND `users`.`email` = ? AND ((`status` = ?) OR (`status` = ? AND `isDeleted` = ?)) LIMIT ? OFFSET ?;")
-    })
-    it("Query Where options 2", async () => {
-      let result = await QueryFind(null as any, "users", {name: {$in: ["Luis", "Bastidas"]}, $and: [{age: {$gte: 18}}, {age: {$lte: 65}}], createdAt: {$between: {$from: new Date("2024-01-01"), $to: new Date("2024-04-01")}}})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(7)
-      expect(query.params[0].length).toBe(2)
-      expect(query.params[0][0]).toBe("Luis")
-      expect(query.params[0][1]).toBe("Bastidas")
-      expect(query.params[1]).toBe(18)
-      expect(query.params[2]).toBe(65)
-      expect(query.params[3].toISOString()).toBe("2024-01-01T00:00:00.000Z")
-      expect(query.params[4].toISOString()).toBe("2024-04-01T00:00:00.000Z")
-      expect(query.params[5]).toBe(1000)
-      expect(query.params[6]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` IN (?) AND (`age` >= ?) AND (`age` <= ?) AND (`createdAt` BETWEEN ? AND ?) LIMIT ? OFFSET ?;")
-    })
-    it("Query Group by options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"}, {groupBy: ["status", {column: "role", table: "users"}]})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1000)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? GROUP BY `status`, `users`.`role` LIMIT ? OFFSET ?;")
-    })
-    it("Query Order by options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"}, {orderBy: [{column: "lastName", order: "ASC"}, {column: "email", order: "ASC", table: "users"}]})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1000)
-      expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? ORDER BY `lastName` ASC, `users`.`email` ASC LIMIT ? OFFSET ?;")
-    })
-    it("Query Limit options", async () => {
-      let result = await QueryFind(null as any, "users", {name: "Luis"}, {limit: {page: 2, per: 10}})
-      let query = result as MysqlQuery
-      expect(query.params.length).toBe(3)
-      expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(10)
-      expect(query.params[2]).toBe(10)
-      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })
   })
 

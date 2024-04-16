@@ -102,16 +102,16 @@ class MysqlCreateTableQuery {
   }
 }
 
-export function CreateTable(table: string, ifNotExists: boolean = true) {
+export function QueryCreateTable(table: string, ifNotExists: boolean = true) {
   return new MysqlCreateTableQuery(table, ifNotExists)
 }
 
-export function DropTable(table: string, ifNotExists: boolean = true) {
-  let data: MysqlQuery = {sql: `DROP TABLE${ifNotExists ? " IF NOT EXISTS" : ""} \`${table}\`;`, params: []}
+export function QueryDropTable(table: string, ifNotExists: boolean = true) {
+  let data: MysqlQuery = {sql: `DROP TABLE${ifNotExists ? " IF EXISTS" : ""} \`${table}\`;`, params: []}
   return data
 }
 
-export function RenameTable(oldName: string, newName: string) {
+export function QueryRenameTable(oldName: string, newName: string) {
   let data: MysqlQuery = {sql: `ALTER TABLE \`${oldName}\` RENAME TO \`${newName}\`;`, params: []}
   return data
 }
@@ -246,7 +246,7 @@ class MysqlAlterTableQuery {
   }
 }
 
-export function AlterTable(table: string) {
+export function QueryAlterTable(table: string) {
   return new MysqlAlterTableQuery(table)
 }
 
@@ -612,7 +612,7 @@ export interface MysqlTableOptions {
   as?: string
 }
 
-export async function QueryFind(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOptions) {
+export async function QueryFind(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOptions): Promise<any[]> {
   let wh = where || {}
   let opt = options || {}
   let find: MysqlQuery = {sql: "", params: []}
@@ -665,14 +665,14 @@ export async function QueryFind(db: MysqlConnector, table: string | MysqlTableOp
   find.params.push(...limit.params)
 
   if (db == null) {
-    return find
+    return [find]
   } else {
-    let results = await db.exec(find.sql, find.params, true)
-    return results
+    let data = await db.exec(find.sql, find.params, true)
+    return data.result
   }
 }
 
-export async function QueryFindOne(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOneOptions) {
+export async function QueryFindOne(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlFindOneOptions): Promise<any> {
   let wh = where || {}
   let opt = options || {}
   let find: MysqlQuery = {sql: "", params: []}
@@ -722,16 +722,16 @@ export async function QueryFindOne(db: MysqlConnector, table: string | MysqlTabl
   if (db == null) {
     return find
   } else {
-    let results = await db.exec(find.sql, find.params, true)
-    if (results.length > 0) {
-      return results[0]
+    let data = await db.exec(find.sql, find.params, true)
+    if (data.result.length > 0) {
+      return data.result[0]
     } else {
       return null
     }
   }
 }
 
-export async function QueryCount(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlCountOptions) {
+export async function QueryCount(db: MysqlConnector, table: string | MysqlTableOptions, where?: MysqlWhereOptions, options?: MysqlCountOptions): Promise<number> {
   let wh = where || {}
   let opt = options || {}
   
@@ -774,11 +774,11 @@ export async function QueryCount(db: MysqlConnector, table: string | MysqlTableO
   find.sql += `;`
 
   if (db == null) {
-    return find
+    return find as any
   } else {
-    let results = await db.exec(find.sql, find.params, true)
-    if (results.length > 0) {
-      return results[0][t].total as number
+    let data = await db.exec(find.sql, find.params, true)
+    if (data.result.length > 0) {
+      return data.result[0][''].total as number
     } else {
       return 0
     }

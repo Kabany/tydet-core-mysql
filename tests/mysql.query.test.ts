@@ -1,5 +1,6 @@
-import { AlterTable, CreateTable, DropTable, RenameTable } from "../src/mysql.query"
+import { MysqlJoinType, QueryAlterTable, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne, QueryRenameTable } from "../src/mysql.query"
 import { MysqlDataType } from "../src/mysql.schema"
+import { MysqlQuery } from "../src/mysql.service"
 
 const TABLE = "my_table"
 
@@ -7,17 +8,17 @@ describe("Mysql Query", () => {
 
   describe("Create Table", () => {
     it("simple create table query", () => {
-      let create = CreateTable(TABLE).addColumn("name", MysqlDataType.VARCHAR).addColumn("lastName", MysqlDataType.VARCHAR).toQuery()
+      let create = QueryCreateTable(TABLE).addColumn("name", MysqlDataType.VARCHAR).addColumn("lastName", MysqlDataType.VARCHAR).toQuery()
       expect(create.sql).toBe("CREATE TABLE IF NOT EXISTS \`my_table\` (\`name\` VARCHAR(255) NOT NULL, \`lastName\` VARCHAR(255) NOT NULL);")
       expect(create.params.length).toBe(0)
     })
     it("if not exists to false", () => {
-      let create = CreateTable(TABLE, false).addColumn("name", MysqlDataType.VARCHAR).toQuery()
+      let create = QueryCreateTable(TABLE, false).addColumn("name", MysqlDataType.VARCHAR).toQuery()
       expect(create.sql).toBe("CREATE TABLE \`my_table\` (\`name\` VARCHAR(255) NOT NULL);")
       expect(create.params.length).toBe(0)
     })
     it("int columns", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("age", MysqlDataType.INT)
         .addColumn("cards", MysqlDataType.INT, {nullable: true, size: 10})
@@ -29,7 +30,7 @@ describe("Mysql Query", () => {
       expect(create.params[0]).toBe(100)
     })
     it("other int types", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("id", MysqlDataType.BIGINT, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("age", MysqlDataType.MEDIUMINT)
         .addColumn("cards", MysqlDataType.TINYINT, {nullable: true, size: 10})
@@ -41,7 +42,7 @@ describe("Mysql Query", () => {
       expect(create.params[0]).toBe(100)
     })
     it("decimal columns", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("total", MysqlDataType.DECIMAL)
         .addColumn("subtotal", MysqlDataType.DECIMAL, {nullable: true, size: 5, decimal: 2})
@@ -50,7 +51,7 @@ describe("Mysql Query", () => {
       expect(create.params.length).toBe(0)
     })
     it("string columns", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("uid", MysqlDataType.VARCHAR, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("name", MysqlDataType.VARCHAR)
         .addColumn("email", MysqlDataType.VARCHAR, {nullable: true, size: 50})
@@ -62,7 +63,7 @@ describe("Mysql Query", () => {
       expect(create.params[0]).toBe("mybag")
     })
     it("other string types", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("uid", MysqlDataType.VARCHAR, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("name", MysqlDataType.VARCHAR)
         .addColumn("email", MysqlDataType.TEXT, {nullable: true, size: 50})
@@ -74,7 +75,7 @@ describe("Mysql Query", () => {
       expect(create.params[0]).toBe("mybag")
     })
     it("boolean columns", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("isReady", MysqlDataType.BOOLEAN)
         .addColumn("isCompleted", MysqlDataType.BOOLEAN, {nullable: true, size: 50})
@@ -86,7 +87,7 @@ describe("Mysql Query", () => {
       expect(create.params[0]).toBeTruthy()
     })
     it("date columns", () => {
-      let create = CreateTable(TABLE, false)
+      let create = QueryCreateTable(TABLE, false)
         .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
         .addColumn("createdAt", MysqlDataType.DATE)
         .addColumn("updatedAt", MysqlDataType.DATETIME, {nullable: true, size: 50})
@@ -98,12 +99,12 @@ describe("Mysql Query", () => {
 
   describe("Drop Table", () => {
     it("simple drop table query", () => {
-      let drop = DropTable(TABLE)
-      expect(drop.sql).toBe("DROP TABLE IF NOT EXISTS \`my_table\`;")
+      let drop = QueryDropTable(TABLE)
+      expect(drop.sql).toBe("DROP TABLE IF EXISTS \`my_table\`;")
       expect(drop.params.length).toBe(0)
     })
     it("if not exists to false", () => {
-      let drop = DropTable(TABLE, false)
+      let drop = QueryDropTable(TABLE, false)
       expect(drop.sql).toBe("DROP TABLE \`my_table\`;")
       expect(drop.params.length).toBe(0)
     })
@@ -111,7 +112,7 @@ describe("Mysql Query", () => {
 
   describe("Rename Table", () => {
     it("simple rename table query", () => {
-      let rename = RenameTable(TABLE, "new_table")
+      let rename = QueryRenameTable(TABLE, "new_table")
       expect(rename.sql).toBe("ALTER TABLE \`my_table\` RENAME TO \`new_table\`;")
       expect(rename.params.length).toBe(0)
     })
@@ -119,9 +120,112 @@ describe("Mysql Query", () => {
 
   describe("Alter Table", () => {
     it("simple alter table query", () => {
-      let alter = AlterTable(TABLE).addColumn("name", MysqlDataType.VARCHAR).modifyColumn("lastName", MysqlDataType.VARCHAR, {after: "name"}).dropColumn("email").toQuery()
+      let alter = QueryAlterTable(TABLE).addColumn("name", MysqlDataType.VARCHAR).modifyColumn("lastName", MysqlDataType.VARCHAR, {after: "name"}).dropColumn("email").toQuery()
       expect(alter.sql).toBe("ALTER TABLE \`my_table\` ADD COLUMN \`name\` VARCHAR(255) NOT NULL, MODIFY COLUMN \`lastName\` VARCHAR(255) NOT NULL AFTER \`name\`, DROP COLUMN \`email\`;")
       expect(alter.params.length).toBe(0)
+    })
+  })
+
+  describe("CRUD methods", () => {
+    it("QueryFind", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("QueryFindOne", async () => {
+      let result = await QueryFindOne(null as any, "users", {name: "Luis"})
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("QueryCount", async () => {
+      let result = await QueryCount(null as any, "users", {name: "Luis"}) as any
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(1)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.sql).toBe("SELECT COUNT(*) AS `total` FROM `users` WHERE `name` = ?;")
+    })
+    it("Query Select options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {select: ["id", "email", {column: "firstName", as: "name"}, {column: "lastName", table: "users"}]})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT `id`, `email`, `firstName` AS `name`, `users`.`lastName` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Query Join options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {join: [
+        {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
+      ]})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` INNER JOIN `comments` ON `users`.`id` = `userId` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+    it("Query Where options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis", "$t.users.email": "email@test.com", $or: [{status: 1}, {status: 2, isDeleted: false}]})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(7)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe("email@test.com")
+      expect(query.params[2]).toBe(1)
+      expect(query.params[3]).toBe(2)
+      expect(query.params[4]).toBeFalsy()
+      expect(query.params[5]).toBe(1000)
+      expect(query.params[6]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? AND `users`.`email` = ? AND ((`status` = ?) OR (`status` = ? AND `isDeleted` = ?)) LIMIT ? OFFSET ?;")
+    })
+    it("Query Where options 2", async () => {
+      let result = await QueryFind(null as any, "users", {name: {$in: ["Luis", "Bastidas"]}, $and: [{age: {$gte: 18}}, {age: {$lte: 65}}], createdAt: {$between: {$from: new Date("2024-01-01"), $to: new Date("2024-04-01")}}})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(7)
+      expect(query.params[0].length).toBe(2)
+      expect(query.params[0][0]).toBe("Luis")
+      expect(query.params[0][1]).toBe("Bastidas")
+      expect(query.params[1]).toBe(18)
+      expect(query.params[2]).toBe(65)
+      expect(query.params[3].toISOString()).toBe("2024-01-01T00:00:00.000Z")
+      expect(query.params[4].toISOString()).toBe("2024-04-01T00:00:00.000Z")
+      expect(query.params[5]).toBe(1000)
+      expect(query.params[6]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` IN (?) AND (`age` >= ?) AND (`age` <= ?) AND (`createdAt` BETWEEN ? AND ?) LIMIT ? OFFSET ?;")
+    })
+    it("Query Group by options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {groupBy: ["status", {column: "role", table: "users"}]})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? GROUP BY `status`, `users`.`role` LIMIT ? OFFSET ?;")
+    })
+    it("Query Order by options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {orderBy: [{column: "lastName", order: "ASC"}, {column: "email", order: "ASC", table: "users"}]})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1000)
+      expect(query.params[2]).toBe(0)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? ORDER BY `lastName` ASC, `users`.`email` ASC LIMIT ? OFFSET ?;")
+    })
+    it("Query Limit options", async () => {
+      let result = await QueryFind(null as any, "users", {name: "Luis"}, {limit: {page: 2, per: 10}})
+      let query = result[0] as MysqlQuery
+      expect(query.params.length).toBe(3)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(10)
+      expect(query.params[2]).toBe(10)
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })
   })
 
