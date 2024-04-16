@@ -1,5 +1,5 @@
 import { MysqlCoreError } from "./mysql.error"
-import { MysqlDataType, MysqlEntityParameter } from "./mysql.schema"
+import { MysqlDataType, MysqlEntity, MysqlEntityParameter } from "./mysql.schema"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
 
 
@@ -299,6 +299,7 @@ export interface MysqlEntityFindOptions {
   groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
   limit?: {page: number, per: number}
+  populate?: typeof MysqlEntity
 }
 
 
@@ -343,43 +344,43 @@ function qwhereParams(key: string, obj: any): MysqlQuery {
   let data: MysqlQuery = {sql: "", params: []};
 
   if (obj["$eq"] !== undefined) {
-    data.sql = `\`${key}\` = ?`;
+    data.sql = `${key} = ?`;
     data.params.push(obj["$eq"]);
   } else if (obj["$neq"] !== undefined) {
-    data.sql = `\`${key}\` <> ?`;
+    data.sql = `${key} <> ?`;
     data.params.push(obj["$neq"]);
   } else if (obj["$gt"] !== undefined) {
-    data.sql = `\`${key}\` > ?`;
+    data.sql = `${key} > ?`;
     data.params.push(obj["$gt"]);
   } else if (obj["$gte"] !== undefined) {
-    data.sql = `\`${key}\` >= ?`;
+    data.sql = `${key} >= ?`;
     data.params.push(obj["$gte"]);
   } else if (obj["$lt"] !== undefined) {
-    data.sql = `\`${key}\` < ?`;
+    data.sql = `${key} < ?`;
     data.params.push(obj["$lt"]);
   } else if (obj["$lte"] !== undefined) {
-    data.sql = `\`${key}\` <= ?`;
+    data.sql = `${key} <= ?`;
     data.params.push(obj["$lte"]);
   } else if (obj["$is"] !== undefined) {
-    data.sql = `\`${key}\` is ?`;
+    data.sql = `${key} is ?`;
     data.params.push(obj["$is"]);
   } else if (obj["$not"] !== undefined) {
-    data.sql = `\`${key}\` is not ?`;
+    data.sql = `${key} is not ?`;
     data.params.push(obj["$not"]);
   } else if (obj["$between"] !== undefined) {
-    data.sql = `(\`${key}\` BETWEEN ? AND ?)`;
+    data.sql = `(${key} BETWEEN ? AND ?)`;
     data.params.push(obj["$between"]["$from"], obj["$between"]["$to"]);
   } else if (obj["$nbetween"] !== undefined) {
-    data.sql = `(\`${key}\` NOT BETWEEN ? AND ?)`;
+    data.sql = `(${key} NOT BETWEEN ? AND ?)`;
     data.params.push(obj["$nbetween"]["$from"], obj["$nbetween"]["$to"]);
   } else if (obj["$in"] !== undefined) {
-    data.sql = `\`${key}\` IN (?)`;
+    data.sql = `${key} IN (?)`;
     data.params.push(obj["$in"]);
   } else if (obj["$nin"] !== undefined) {
-    data.sql = `\`${key}\` NOT IN (?)`;
+    data.sql = `${key} NOT IN (?)`;
     data.params.push(obj["$nin"]);
   } else {
-    data.sql = `\`${key}\` = ?`;
+    data.sql = `${key} = ?`;
     data.params.push(obj);
   }
 
@@ -464,16 +465,16 @@ export function qwhere(where: MysqlWhereOptions, _subquery: boolean = false): My
             data.sql += " AND ";
           }
           let type = typeof where[key]
-          let k = key.startsWith("$t")
+          let keyName = key.startsWith("$t.") ? `\`${key.split(".")[1]}\`.\`${key.split(".")[2]}\`` : `\`${key}\``
           // resolve table name
           if (where[key] === null || where[key] === undefined) {
-            data.sql += `\`${key}\` IS NULL`;
+            data.sql += `${keyName} IS NULL`;
           } else if (type == "object") {
-            let c = qwhereParams(key, where[key])
+            let c = qwhereParams(keyName, where[key])
             data.sql += c.sql;
             data.params.push(...c.params)
           } else {
-            data.sql += `\`${key}\` = ?`;
+            data.sql += `${keyName} = ?`;
             data.params.push(where[key]);
           }
           break;
@@ -585,6 +586,7 @@ export interface MysqlEntityFindOneOptions {
   select?: (string | MysqlSelectOptions)[]
   groupBy?: (string | MysqlGroupOptions)[]
   orderBy?: MysqlOrderOptions[]
+  populate?: typeof MysqlEntity
 }
 
 export interface MysqlCountOptions {

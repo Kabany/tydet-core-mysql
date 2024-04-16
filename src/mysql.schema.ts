@@ -1,6 +1,6 @@
 import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
-import { MysqlEntityValidationError } from "./mysql.error"
+import { MysqlCoreError, MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
 import { MysqlCountOptions, MysqlEntityCountOptions, MysqlEntityFindOneOptions, MysqlEntityFindOptions, MysqlFindOneOptions, MysqlFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 
@@ -437,16 +437,22 @@ export class MysqlEntity {
       let w: any = {}
       if (association.type == MysqlAssociationType.HAS_MANY || association.type == MysqlAssociationType.HAS_ONE) {
         w[association.foreignKey] = this[pk]
+        if (association.type == MysqlAssociationType.HAS_ONE) {
+          let entity = await association.entity.FindOne(db, w)
+          this[association.entityName] = entity
+        } else {
+          let entity = await association.entity.Find(db, w)
+          this[association.entityName] = entity
+        }
       } else if (association.type == MysqlAssociationType.BELONGS_TO) {
         let remotePk = association.entity.getPrimaryKey() || "id"
         w[remotePk] = this[association.foreignKey]
+        let entity = await association.entity.FindOne(db, w)
+        this[association.entityName] = entity
       } else {
-        // TODO for many to many
+        // TODO: handle many to many
         
       }
-      
-      let entity = await association.entity.FindOne(db, w)
-      this[association.entityName] = entity
     }
   }
 
@@ -594,11 +600,39 @@ export class MysqlEntity {
     let opt = options || {}
     let columns = this.getColumns() as MysqlEntityParameter[]
     let find: MysqlQuery = {sql: "", params: []}
-    let table = this.getTableName()
+    let table = this.getTableName()  
+    let pk = this.getPrimaryKey()
+
+    let relations = this.getAssociations()
+    let join: MysqlEntityAssociation
+    if (opt.populate != null) {
+      let exist = relations.find(r => r.entity.getTableName() == opt.populate.getTableName())
+      if (exist) {
+        join = exist
+      } else {
+        throw new MysqlCoreError(`The entity "${opt.populate.getTableName()}" is not defined in the associations of this entity "${table}".`)
+      }
+    }
+    let jselect: MysqlQuery = {sql: "", params: []}
+    let joinquery: MysqlQuery = {sql: "", params: []}
+    if (join != null) {
+      let jcolumns = join.entity.getColumns()
+      for (let column of jcolumns) {
+        jselect.sql += `, \`${join.entityName}\`.\`${column.columnName}\``
+      }
+      if (join.type == MysqlAssociationType.BELONGS_TO) {
+        joinquery.sql += ` INNER JOIN \`${join.entityName}\` ON \`${table}\`.\`${join.foreignKey}\` = \`${join.entityName}\`.\`${join.entity.getPrimaryKey() || "id"}\``
+      } else if (join.type == MysqlAssociationType.HAS_MANY || join.type == MysqlAssociationType.HAS_ONE) {
+        joinquery.sql += ` INNER JOIN \`${join.entityName}\` ON \`${table}\`.\`${this.getPrimaryKey()}\` = \`${join.entityName}\`.\`${join.foreignKey}\``
+      } else {
+        // TODO: handle many to many
+      }
+    }
 
     let select: MysqlQuery = {sql: "", params: []}
     if (opt.select == null || opt.select.length == 0) {
       let isFirst = true
+      let pretable = join != null ? `\`${table}\`.` : "" // if join add table name
       for (let column of columns) {
         if (isFirst) {
           select.sql += "SELECT "
@@ -606,15 +640,13 @@ export class MysqlEntity {
         } else {
           select.sql += ", "
         }
-        select.sql += `\`${column.columnName}\``
+        select.sql += `${pretable}\`${column.columnName}\``
       }
     } else {
       select = qselect(opt.select || [])
     }
-    find.sql += `${select.sql} FROM \`${table}\``
+    find.sql += `${select.sql}${jselect.sql} FROM \`${table}\`${joinquery.sql}`
     find.params.push(...select.params)
-
-    // join
 
     let w: MysqlQuery = {sql: "", params: []}
     if (Object.keys(wh).length > 0) {
@@ -651,9 +683,59 @@ export class MysqlEntity {
     } else {
       let results = await db.exec(find.sql, find.params, true)
       let list = []
+      let holder: MysqlEntity
+      let subholder: MysqlEntity[] = []
       for (let result of results) {
-        let entity = this.constructor(result[table], {readColumn: true})
-        list.push(entity)
+        if (join != null) {
+          if (holder != null) {
+            if (holder[pk] != result[table][pk]) {
+              if (join.type == MysqlAssociationType.BELONGS_TO || join.type == MysqlAssociationType.HAS_ONE) {
+                holder[join.entityName] = subholder[0] != null ? new join.entity(subholder[0]) : undefined
+                subholder = []
+                list.push(holder)
+                holder = null
+              } else if (join.type == MysqlAssociationType.HAS_MANY) {
+                holder[join.entityName] = [...subholder]
+                subholder = []
+                list.push(holder)
+                holder = null
+              } else {
+                // TODO: Handle many to many
+              }
+            } else {
+              if (result[join.entityName] != null) {
+                let sub = new join.entity(result[join.entityName], {readColumn: true})
+                subholder.push(sub)
+              }
+            }
+          }
+
+          if (holder == null) {
+            holder = this.constructor(result[table], {readColumn: true})
+            if (result[join.entityName] != null) {
+              let sub = new join.entity(result[join.entityName], {readColumn: true})
+              subholder.push(sub)
+            }
+          }
+        } else {
+          let entity = this.constructor(result[table], {readColumn: true})
+          list.push(entity)
+        }
+      }
+      if (join != null) {
+        if (join.type == MysqlAssociationType.BELONGS_TO || join.type == MysqlAssociationType.HAS_ONE) {
+          holder[join.entityName] = subholder[0] != null ? new join.entity(subholder[0]) : undefined
+          subholder = []
+          list.push(holder)
+          holder = null
+        } else if (join.type == MysqlAssociationType.HAS_MANY) {
+          holder[join.entityName] = [...subholder]
+          subholder = []
+          list.push(holder)
+          holder = null
+        } else {
+          // TODO: Handle many to many
+        }
       }
       return list
     }
@@ -665,10 +747,38 @@ export class MysqlEntity {
     let columns = this.getColumns() as MysqlEntityParameter[]
     let find: MysqlQuery = {sql: "", params: []}
     let table = this.getTableName()
+    let pk = this.getPrimaryKey()
+
+    let relations = this.getAssociations()
+    let join: MysqlEntityAssociation
+    if (opt.populate != null) {
+      let exist = relations.find(r => r.entity.getTableName() == opt.populate.getTableName())
+      if (exist) {
+        join = exist
+      } else {
+        throw new MysqlCoreError(`The entity "${opt.populate.getTableName()}" is not defined in the associations of this entity "${table}".`)
+      }
+    }
+    let jselect: MysqlQuery = {sql: "", params: []}
+    let joinquery: MysqlQuery = {sql: "", params: []}
+    if (join != null) {
+      let jcolumns = join.entity.getColumns()
+      for (let column of jcolumns) {
+        jselect.sql += `, \`${join.entityName}\`.\`${column.columnName}\``
+      }
+      if (join.type == MysqlAssociationType.BELONGS_TO) {
+        joinquery.sql += ` INNER JOIN \`${join.entityName}\` ON \`${table}\`.\`${join.foreignKey}\` = \`${join.entityName}\`.\`${join.entity.getPrimaryKey() || "id"}\``
+      } else if (join.type == MysqlAssociationType.HAS_MANY || join.type == MysqlAssociationType.HAS_ONE) {
+        joinquery.sql += ` INNER JOIN \`${join.entityName}\` ON \`${table}\`.\`${this.getPrimaryKey()}\` = \`${join.entityName}\`.\`${join.foreignKey}\``
+      } else {
+        // TODO: handle many to many
+      }
+    }
 
     let select: MysqlQuery = {sql: "", params: []}
     if (opt.select == null || opt.select.length == 0) {
       let isFirst = true
+      let pretable = join != null ? `\`${table}\`.` : "" // if join add table name
       for (let column of columns) {
         if (isFirst) {
           select.sql += "SELECT "
@@ -676,15 +786,13 @@ export class MysqlEntity {
         } else {
           select.sql += ", "
         }
-        select.sql += `\`${column.columnName}\``
+        select.sql += `${pretable}\`${column.columnName}\``
       }
     } else {
       select = qselect(opt.select || [])
     }
-    find.sql += `${select.sql} FROM \`${table}\``
+    find.sql += `${select.sql}${jselect.sql} FROM \`${table}\`${joinquery.sql}`
     find.params.push(...select.params)
-
-    // join
 
     let w: MysqlQuery = {sql: "", params: []}
     if (Object.keys(wh).length > 0) {
@@ -715,11 +823,62 @@ export class MysqlEntity {
       return find
     } else {
       let results = await db.exec(find.sql, find.params, true)
-      if (results.length > 0) {
-        return this.constructor(results[0][table], {readColumn: true})
-      } else {
-        return null
+      let list = []
+      let holder: MysqlEntity
+      let subholder: MysqlEntity[] = []
+      for (let result of results) {
+        if (join != null) {
+          if (holder != null) {
+            if (holder[pk] != result[table][pk]) {
+              if (join.type == MysqlAssociationType.BELONGS_TO || join.type == MysqlAssociationType.HAS_ONE) {
+                holder[join.entityName] = subholder[0] != null ? new join.entity(subholder[0]) : undefined
+                subholder = []
+                list.push(holder)
+                holder = null
+              } else if (join.type == MysqlAssociationType.HAS_MANY) {
+                holder[join.entityName] = [...subholder]
+                subholder = []
+                list.push(holder)
+                holder = null
+              } else {
+                // TODO: Handle many to many
+              }
+            } else {
+              if (result[join.entityName] != null) {
+                let sub = new join.entity(result[join.entityName], {readColumn: true})
+                subholder.push(sub)
+              }
+            }
+          }
+
+          if (holder == null) {
+            holder = this.constructor(result[table], {readColumn: true})
+            if (result[join.entityName] != null) {
+              let sub = new join.entity(result[join.entityName], {readColumn: true})
+              subholder.push(sub)
+            }
+          }
+        } else {
+          let entity = this.constructor(result[table], {readColumn: true})
+          list.push(entity)
+        }
       }
+      if (join != null) {
+        if (join.type == MysqlAssociationType.BELONGS_TO || join.type == MysqlAssociationType.HAS_ONE) {
+          holder[join.entityName] = subholder[0] != null ? new join.entity(subholder[0]) : undefined
+          subholder = []
+          list.push(holder)
+          holder = null
+        } else if (join.type == MysqlAssociationType.HAS_MANY) {
+          holder[join.entityName] = [...subholder]
+          subholder = []
+          list.push(holder)
+          holder = null
+        } else {
+          // TODO: Handle many to many
+        }
+      }
+      return list[0]
     }
   }
 
@@ -744,8 +903,6 @@ export class MysqlEntity {
     let select = qselect([{column: pk, as: "total", operator: MysqlOperator.COUNT}])
     find.sql += `${select.sql} FROM \`${table}\``
     find.params.push(...select.params)
-
-    // join
 
     let w: MysqlQuery = {sql: "", params: []}
     if (Object.keys(wh).length > 0) {
