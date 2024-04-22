@@ -2,7 +2,7 @@ import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
 import { MysqlCoreError, MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
-import { MysqlEntityCountOptions, MysqlEntityFindOneOptions, MysqlEntityFindOptions, MysqlOperator, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
+import { MysqlGroupOptions, MysqlOperator, MysqlOrderOptions, MysqlSelectOptions, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 
 
 export enum MysqlDataType {
@@ -106,6 +106,30 @@ interface MysqlEntityAssociation {
   foreignKey?: string
   through?: typeof MysqlEntity
 }
+
+
+export interface MysqlEntityFindOptions {
+  select?: (string | MysqlSelectOptions)[]
+  groupBy?: (string | MysqlGroupOptions)[]
+  orderBy?: MysqlOrderOptions[]
+  limit?: {page: number, per: number}
+  populate?: typeof MysqlEntity
+}
+
+export interface MysqlEntityFindOneOptions {
+  select?: (string | MysqlSelectOptions)[]
+  groupBy?: (string | MysqlGroupOptions)[]
+  orderBy?: MysqlOrderOptions[]
+  populate?: typeof MysqlEntity
+}
+
+export interface MysqlEntityCountOptions {
+  countBy?: string
+  groupBy?: (string | MysqlGroupOptions)[]
+}
+
+
+
 
 export class MysqlEntity {
   static getTableName() {

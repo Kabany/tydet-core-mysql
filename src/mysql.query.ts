@@ -294,13 +294,7 @@ export interface MysqlFindOptions {
   limit?: {page: number, per: number}
 }
 
-export interface MysqlEntityFindOptions {
-  select?: (string | MysqlSelectOptions)[]
-  groupBy?: (string | MysqlGroupOptions)[]
-  orderBy?: MysqlOrderOptions[]
-  limit?: {page: number, per: number}
-  populate?: typeof MysqlEntity
-}
+
 
 
 
@@ -582,21 +576,9 @@ export interface MysqlFindOneOptions {
   orderBy?: MysqlOrderOptions[]
 }
 
-export interface MysqlEntityFindOneOptions {
-  select?: (string | MysqlSelectOptions)[]
-  groupBy?: (string | MysqlGroupOptions)[]
-  orderBy?: MysqlOrderOptions[]
-  populate?: typeof MysqlEntity
-}
-
 export interface MysqlCountOptions {
   countBy?: string
   join?: MysqlJoinOptions[]
-  groupBy?: (string | MysqlGroupOptions)[]
-}
-
-export interface MysqlEntityCountOptions {
-  countBy?: string
   groupBy?: (string | MysqlGroupOptions)[]
 }
 

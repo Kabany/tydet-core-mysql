@@ -1,7 +1,7 @@
 import { MysqlDataType, MysqlDefaultValues, MysqlEntity } from "../src/mysql.schema";
 import { MysqlMigration, MysqlMigrationHandler } from "../src/mysql.migration"
 import { MysqlConnector } from "../src/mysql.service";
-import { QueryCreateTable, QueryDropTable } from "../src/mysql.query";
+import { MysqlJoinType, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne } from "../src/mysql.query";
 import { Context } from "tydet-core";
 
 const DB_HOST = "192.168.68.117"
@@ -156,20 +156,38 @@ describe("Mysql Migration", () => {
     expect(comment5.id).not.toBeUndefined()
     expect(comment5.createdAt).not.toBeUndefined()
 
-    // read
-    let users = await User.Find(db, {}) as User[]
-    expect(users.length).toBe(2)
-    expect(users[0].lastName).toBe("1")
-    expect(users[1].lastName).toBe("2")
+    // read with query methods
+    let qusers = await QueryFind(db, "users")
+    expect(qusers.length).toBe(2)
+    expect(qusers[0].users).not.toBeUndefined()
+    expect(qusers[0].users.lastName).toBe("1")
+    expect(qusers[1].users.lastName).toBe("2")
 
-    let countComments = await Comment.Count(db, {userId: user2.id})
-    expect(countComments).toBe(3)
+    let quser1 = await QueryFindOne(db, "users", {lastName: "2"})
+    expect(quser1.users).not.toBeUndefined()
+    expect(quser1.users.lastName).toBe("2")
 
-    /*let user = await User.FindOne(db, {"$t.users.id": 1}, {populate: Comment})
-    expect(user.lastName).toBe("1")
-    expect(user.comments).not.toBeUndefined()
-    expect(user.comments.length).toBe(2)
-    expect(user.comments[0].message).toBe("This is the first comment")*/
+    let qcount = await QueryCount(db, "comments")
+    expect(qcount).toBe(5)
+
+    // joins with query methods
+    let qusers2 = await QueryFind(db, "users", {}, {join: [
+      {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
+    ]})
+    expect(qusers2.length).toBe(5)
+    expect(qusers2[0].users.id).toBe(qusers2[1].users.id)
+    expect(qusers2[0].comments.id).not.toBe(qusers2[1].comments.id)
+    expect(qusers2[0].users.id).not.toBe(qusers2[2].users.id)
+
+    let quser2 = await QueryFindOne(db, "users", {"$t.users.lastName": "2"}, {join: [
+      {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
+    ]})
+    expect(quser2.users.id).toBe(quser2.comments.userId)
+
+    let count = await QueryCount(db, "users", {"$t.users.lastName": "2"}, {join: [
+      {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
+    ]})
+    expect(count).toBe(3)
     
     // drop
     await migrationHandler.rollback()
