@@ -68,6 +68,68 @@ Comment.DefineSchema("comments", {
 User.hasMany(Comment, "userId", "comments")
 Comment.belongsTo(User, "userId")
 
+class Actor extends MysqlEntity {
+  id: number
+  name: string
+
+  movies?: Movie[]
+}
+
+Actor.DefineSchema("actors", {
+  id: {
+    type: MysqlDataType.INT,
+    primaryKey: true
+  },
+  name: {
+    type: MysqlDataType.VARCHAR,
+    required: true
+  }
+})
+
+class Movie extends MysqlEntity {
+  id: number
+  title: string
+
+  actors?: Actor[]
+}
+
+Movie.DefineSchema("movies", {
+  id: {
+    type: MysqlDataType.INT,
+    primaryKey: true
+  },
+  title: {
+    type: MysqlDataType.VARCHAR,
+    required: true
+  }
+})
+
+class Cast extends MysqlEntity {
+  id: number
+  actorId: number
+  movieId: number
+}
+
+Cast.DefineSchema("cast", {
+  id: {
+    type: MysqlDataType.INT,
+    primaryKey: true
+  },
+  actorId: {
+    type: MysqlDataType.INT,
+    required: true
+  },
+  movieId: {
+    type: MysqlDataType.INT,
+    required: true
+  }
+})
+
+Actor.belongsToMany(Movie, Cast, "userId", "movies")
+Movie.belongsToMany(Actor, Cast, "movieId", "actors")
+Cast.hasOne(Movie, "movieId")
+Cast.hasOne(Actor, "actorId")
+
 class TestMigration extends MysqlMigration {
   override async up(db: MysqlConnector) {
     let createUser = QueryCreateTable("users", true)
@@ -96,6 +158,7 @@ class TestMigration extends MysqlMigration {
 
 describe("Mysql Migration", () => {
   it("should migrate, then execute CRUD operations, then rollback", async () => {
+    
     // prepare
     let app = new Context()
     let db = new MysqlConnector({host: DB_HOST, db: DB_NAME, user: DB_USER, pass: DB_PASS})
@@ -188,8 +251,22 @@ describe("Mysql Migration", () => {
       {table: "comments", type: MysqlJoinType.INNER, on: {table: "users", column: "id"}, with: "userId"}
     ]})
     expect(count).toBe(3)
+
+    // joins with entity
+    let userWithComments = await User.Find(db, {}, {populate: [Comment]})
+    console.log(userWithComments)
+    expect(userWithComments.length).toBe(2)
+    expect(userWithComments[0].id).not.toBe(userWithComments[1].id)
+    expect(userWithComments[0].comments.length).toBe(2)
+    expect(userWithComments[1].comments.length).toBe(3)
+    expect(userWithComments[0].comments[0].id).not.toBe(userWithComments[0].comments[1].id)
+    expect(userWithComments[1].comments[0].id).not.toBe(userWithComments[1].comments[1].id)
+    expect(userWithComments[1].comments[0].id).not.toBe(userWithComments[1].comments[2].id)
     
     // drop
     await migrationHandler.rollback()
+
+    // close service
+    await app.unmountServices()
   })
 })

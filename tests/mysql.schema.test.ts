@@ -170,7 +170,7 @@ describe("Mysql Schema", () => {
       expect(query.params[0]).toBe("Luis")
       expect(query.params[1]).toBe(1000)
       expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT `id`, `firstName`, `lastName`, `email` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })
     it("Entity FindOne query", async () => {
       let result = await User.FindOne(null as any, {name: "Luis"})
@@ -179,7 +179,7 @@ describe("Mysql Schema", () => {
       expect(query.params[0]).toBe("Luis")
       expect(query.params[1]).toBe(1)
       expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT `id`, `firstName`, `lastName`, `email` FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+      expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })
     it("Entity Count query", async () => {
       let result = await User.Count(null as any, {name: "Luis"}) as any
@@ -198,13 +198,13 @@ describe("Mysql Schema", () => {
       expect(query.sql).toBe("SELECT `firstName`, `lastName` FROM `users` WHERE `firstName` = ? LIMIT ? OFFSET ?;")
     })
     it("Entity Join options", async () => {
-      let result = await User.Find(null as any, {"$t.users.firstName": "Luis"}, {populate: Comment})
+      let result = await User.Find(null as any, {"$t.users.firstName": "Luis"}, {populate: [Comment]})
       let query = result[0]
       expect(query.params.length).toBe(3)
       expect(query.params[0]).toBe("Luis")
       expect(query.params[1]).toBe(1000)
       expect(query.params[2]).toBe(0)
-      expect(query.sql).toBe("SELECT `users`.`id`, `users`.`firstName`, `users`.`lastName`, `users`.`email`, `comments`.`id`, `comments`.`userId`, `comments`.`message`, `comments`.`createdAt` FROM `users` INNER JOIN `comments` ON `users`.`id` = `comments`.`userId` WHERE `users`.`firstName` = ? LIMIT ? OFFSET ?;")
+      expect(query.sql).toBe("SELECT * FROM `users` INNER JOIN `comments` ON `users`.`id` = `comments`.`userId` WHERE `users`.`firstName` = ? LIMIT ? OFFSET ?;")
     })
   })
 
