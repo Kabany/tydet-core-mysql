@@ -1,5 +1,3 @@
-import { MysqlEntityValidationError } from "../src/mysql.error"
-import { MysqlJoinType, QueryCount, QueryFind, QueryFindOne } from "../src/mysql.query"
 import { MysqlDataType, MysqlDefaultValues, MysqlEntity } from "../src/mysql.schema"
 import { MysqlQuery } from "../src/mysql.service"
 

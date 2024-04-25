@@ -1,5 +1,5 @@
 import { MysqlCoreError } from "./mysql.error"
-import { MysqlDataType, MysqlEntity, MysqlEntityParameter } from "./mysql.schema"
+import { MysqlDataType } from "./mysql.schema"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
 
 
@@ -257,7 +257,8 @@ export function QueryAlterTable(table: string) {
 // CRUD operations
 
 export enum MysqlOperator {
-  COUNT = "COUNT"
+  COUNT = "COUNT",
+  DISTINCT = "DISTINCT"
 }
 
 export interface MysqlSelectOptions {

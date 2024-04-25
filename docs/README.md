@@ -1,21 +1,8 @@
-# TyDeT Core MySQL
-> TyDeT Core MySQL is a Typescript & Javascript library for TyDeT Core to handle a connection to a MySQL database.
+# Documentation
 
-TyDeT (Typescript Developer Tools) Core MySQL is a module for [TyDeT Core][tydet-core] to handle a connection with a MySQL Database and managing the entities, validations, migrations and other tools.
+TyDeT (Typescript Developer Tools) Core MySQL is a module to handle a connection with a MySQL Database and managing the entities, validations, migrations and other tools.
 
-## Installation
-
-This is a Node.js module available through the npm registry. Installation is done using the npm install command:
-
-```shell
-npm install tydet-core tydet-core-mysql
-```
-
-It is required to install [TyDeT Core][tydet-core] to use this module.
-
-## Usage
-
-### Basic usage
+## Basic usage
 
 ```js
 import { Context } from 'tydet-core';
@@ -23,7 +10,7 @@ import { MysqlConnector, MysqlEntity, QueryFind } from 'tydet-core-mysql';
 
 // Add connector as Service
 let app = new Context()
-let mysql = new MysqlConnector()
+let mysql = new MysqlConnector({host: "db.com", db: "mydb", user: "user", pass: "pass", port: 3306})
 await app.mountService("mysql", mysql)
 
 // Execute queries
@@ -81,25 +68,18 @@ let users = await User.Find(mysql, {firstName: "My name"})
 
 ```
 
-Check the [docs][docs] for more details about the service.
+## Configuration
 
-## Changelog
+The input arguments are required and will define the connection to the database:
 
-[Learn about the latest improvements][changelog].
+```js
+let mysql = new MysqlConnector({host: "db.com", db: "mydb", user: "user", pass: "pass", port: 3306})
+```
 
-## License
+The only argument (`MysqlParamsInterface`) define the server `host`, `db` (Database name), `user`, `pass` and `port` (optional) required to establish a connection with a MySQL Database.
 
-[MIT License][license].
+## Migrations
 
-## Contributing
+## Query Builders
 
-We'd love for you to contribute to TyAPI Core Mysql and help make it even better than it is today! Find out how you can contribute [here][contribute].
-
-
-
-<!-- Markdown link & img dfn's -->
-[license]: ./LICENSE
-[changelog]: ./CHANGELOG.md
-[contribute]: ./CONTRIBUTING.md
-[tydet-core]: https://github.com/Kabany/tydet-core
-[docs]: ./docs/README.md
+## Entities
