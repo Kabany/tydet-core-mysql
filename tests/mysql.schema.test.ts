@@ -177,7 +177,7 @@ describe("Mysql Schema", () => {
       let query = result
       expect(query.params.length).toBe(3)
       expect(query.params[0]).toBe("Luis")
-      expect(query.params[1]).toBe(1)
+      expect(query.params[1]).toBe(1000)
       expect(query.params[2]).toBe(0)
       expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
     })

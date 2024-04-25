@@ -66,7 +66,7 @@ Comment.DefineSchema("comments", {
 })
 
 User.hasMany(Comment, "userId", "comments")
-Comment.belongsTo(User, "userId")
+Comment.belongsTo(User, "userId", "user")
 
 class Actor extends MysqlEntity {
   id: number
@@ -127,8 +127,8 @@ Cast.DefineSchema("cast", {
 
 Actor.belongsToMany(Movie, Cast, "userId", "movies")
 Movie.belongsToMany(Actor, Cast, "movieId", "actors")
-Cast.hasOne(Movie, "movieId")
-Cast.hasOne(Actor, "actorId")
+Cast.belongsTo(Movie, "movieId")
+Cast.belongsTo(Actor, "actorId")
 
 class TestMigration extends MysqlMigration {
   override async up(db: MysqlConnector) {
@@ -146,6 +146,22 @@ class TestMigration extends MysqlMigration {
       .addColumn("createdAt", MysqlDataType.DATETIME, {nullable: false})
       .toQuery()
     await db.run(createComments)
+    let createActors = QueryCreateTable("actors", true)
+      .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
+      .addColumn("name", MysqlDataType.VARCHAR, {nullable: false})
+      .toQuery()
+    await db.run(createActors)
+    let createMovies = QueryCreateTable("movies", true)
+      .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
+      .addColumn("title", MysqlDataType.VARCHAR, {nullable: false})
+      .toQuery()
+    await db.run(createMovies)
+    let createCast = QueryCreateTable("cast", true)
+      .addColumn("id", MysqlDataType.INT, {primaryKey: true, autoincrement: true, nullable: false})
+      .addColumn("actorId", MysqlDataType.INT, {nullable: false})
+      .addColumn("movieId", MysqlDataType.INT, {nullable: false})
+      .toQuery()
+    await db.run(createCast)
   }
 
   override async down(db: MysqlConnector) {
@@ -153,21 +169,31 @@ class TestMigration extends MysqlMigration {
     await db.run(dropUsers)
     let dropComments = QueryDropTable("comments", true)
     await db.run(dropComments)
+    let dropActors = QueryDropTable("actors", true)
+    await db.run(dropActors)
+    let dropMovies = QueryDropTable("movies", true)
+    await db.run(dropMovies)
+    let dropCast = QueryDropTable("cast", true)
+    await db.run(dropCast)
   }
 }
 
+
 describe("Mysql Migration", () => {
-  it("should migrate, then execute CRUD operations, then rollback", async () => {
-    
+  let app = new Context()
+  let db = new MysqlConnector({host: DB_HOST, db: DB_NAME, user: DB_USER, pass: DB_PASS})
+  let migrationHandler: MysqlMigrationHandler
+
+  beforeAll(async () => {
     // prepare
-    let app = new Context()
-    let db = new MysqlConnector({host: DB_HOST, db: DB_NAME, user: DB_USER, pass: DB_PASS})
     await app.mountService("mysql", db)
 
-    let migrationHandler = new MysqlMigrationHandler(db, [TestMigration], app)
+    migrationHandler = new MysqlMigrationHandler(db, [TestMigration], app)
     await migrationHandler.prepare()
     await migrationHandler.migrate()
+  })
 
+  it("should execute CRUD operations with users and comments - one to many", async () => {
     // create
     let user1 = new User({firstName: "User", lastName: "1"})
     await user1.insert(db)
@@ -254,7 +280,6 @@ describe("Mysql Migration", () => {
 
     // joins with entity
     let userWithComments = await User.Find(db, {}, {populate: [Comment]})
-    console.log(userWithComments)
     expect(userWithComments.length).toBe(2)
     expect(userWithComments[0].id).not.toBe(userWithComments[1].id)
     expect(userWithComments[0].comments.length).toBe(2)
@@ -262,7 +287,75 @@ describe("Mysql Migration", () => {
     expect(userWithComments[0].comments[0].id).not.toBe(userWithComments[0].comments[1].id)
     expect(userWithComments[1].comments[0].id).not.toBe(userWithComments[1].comments[1].id)
     expect(userWithComments[1].comments[0].id).not.toBe(userWithComments[1].comments[2].id)
-    
+
+    let userComments = await User.FindOne(db, {}, {populate: [Comment]})
+    expect(userComments.comments.length).toBe(2)
+    expect(userComments.comments[0].id).not.toBe(userComments.comments[1].id)
+
+    let comment = await Comment.FindOne(db, {}, {populate: [User]})
+    expect(comment.user).not.toBeUndefined()
+
+    let usr2 = await User.FindOne(db, {lastName: "2"})
+    expect(usr2).not.toBeNull()
+    expect(usr2.comments).toBeUndefined()
+    await usr2.populate(db)
+    expect(usr2.comments).not.toBeUndefined()
+    expect(usr2.comments.length).toBe(3)
+  })
+
+  it("should execute CRUD operations with actors and movies - many to many", async () => {
+    // add actors and movies
+    let actor1 = new Actor({name: "Luis"})
+    await actor1.insert(db)
+    let actor2 = new Actor({name: "Adrian"})
+    await actor2.insert(db)
+    let actor3 = new Actor({name: "Daniel"})
+    await actor3.insert(db)
+    let movie1 = new Movie({title: "The movie 1"})
+    await movie1.insert(db)
+    let movie2 = new Movie({title: "The movie 2"})
+    await movie2.insert(db)
+    let movie3 = new Movie({title: "The movie 3"})
+    await movie3.insert(db)
+    let movie4 = new Movie({title: "The movie 4"})
+    await movie4.insert(db)
+    // set relations
+    let cast1a = new Cast({actorId: actor1.id, movieId: movie1.id})
+    let cast1b = new Cast({actorId: actor2.id, movieId: movie1.id})
+    await cast1a.insert(db)
+    await cast1b.insert(db)
+    let cast2a = new Cast({actorId: actor2.id, movieId: movie2.id})
+    let cast2b = new Cast({actorId: actor3.id, movieId: movie2.id})
+    await cast2a.insert(db)
+    await cast2b.insert(db)
+    let cast3a = new Cast({actorId: actor1.id, movieId: movie3.id})
+    let cast3b = new Cast({actorId: actor3.id, movieId: movie3.id})
+    await cast3a.insert(db)
+    await cast3b.insert(db)
+    let cast4a = new Cast({actorId: actor1.id, movieId: movie4.id})
+    let cast4b = new Cast({actorId: actor2.id, movieId: movie4.id})
+    let cast4c = new Cast({actorId: actor3.id, movieId: movie4.id})
+    await cast4a.insert(db)
+    await cast4b.insert(db)
+    await cast4c.insert(db)
+
+    let a1 = await Actor.Find(db, {name: "Luis"}, {populate: [Movie]})
+    expect(a1.length).toBe(1)
+    expect(a1[0].movies.length).toBe(3)
+    expect(a1[0].movies[0].id).not.toBe(a1[0].movies[1].id)
+    expect(a1[0].movies[0].id).not.toBe(a1[0].movies[2].id)
+
+    let a2 = await Actor.FindOne(db, {name: "Adrian"})
+    expect(a2).not.toBeNull()
+    expect(a2.movies).toBeUndefined()
+    await a2.populate(db)
+    expect(a2.movies).not.toBeUndefined()
+    expect(a2.movies.length).toBe(3)
+    expect(a2.movies[0].id).not.toBe(a2.movies[1].id)
+    expect(a2.movies[0].id).not.toBe(a2.movies[2].id)
+  })
+
+  afterAll(async () => {
     // drop
     await migrationHandler.rollback()
 
