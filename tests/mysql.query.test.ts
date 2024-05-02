@@ -99,12 +99,12 @@ describe("Mysql Query", () => {
 
   describe("Drop Table", () => {
     it("simple drop table query", () => {
-      let drop = QueryDropTable(TABLE)
+      let drop = QueryDropTable(TABLE).toQuery()
       expect(drop.sql).toBe("DROP TABLE IF EXISTS \`my_table\`;")
       expect(drop.params.length).toBe(0)
     })
     it("if not exists to false", () => {
-      let drop = QueryDropTable(TABLE, false)
+      let drop = QueryDropTable(TABLE, false).toQuery()
       expect(drop.sql).toBe("DROP TABLE \`my_table\`;")
       expect(drop.params.length).toBe(0)
     })
@@ -112,7 +112,7 @@ describe("Mysql Query", () => {
 
   describe("Rename Table", () => {
     it("simple rename table query", () => {
-      let rename = QueryRenameTable(TABLE, "new_table")
+      let rename = QueryRenameTable(TABLE, "new_table").toQuery()
       expect(rename.sql).toBe("ALTER TABLE \`my_table\` RENAME TO \`new_table\`;")
       expect(rename.params.length).toBe(0)
     })

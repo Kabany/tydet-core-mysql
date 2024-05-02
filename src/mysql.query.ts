@@ -100,20 +100,54 @@ class MysqlCreateTableQuery {
     data.sql += `);`
     return data
   }
+
+  async run(db: MysqlConnector) {
+    return await db.run(this.toQuery())
+  }
 }
 
 export function QueryCreateTable(table: string, ifNotExists: boolean = true) {
   return new MysqlCreateTableQuery(table, ifNotExists)
 }
 
-export function QueryDropTable(table: string, ifNotExists: boolean = true) {
-  let data: MysqlQuery = {sql: `DROP TABLE${ifNotExists ? " IF EXISTS" : ""} \`${table}\`;`, params: []}
-  return data
+class MysqlDropTableQuery {
+  private table: string
+  private ifExists: boolean
+  constructor(table: string, ifExists: boolean = true) {
+    this.table = table
+    this.ifExists = ifExists
+  }
+  toQuery() {
+    let data: MysqlQuery = {sql: `DROP TABLE${this.ifExists ? " IF EXISTS" : ""} \`${this.table}\`;`, params: []}
+    return data
+  }
+  async run(db: MysqlConnector) {
+    return await db.run(this.toQuery())
+  }
 }
 
-export function QueryRenameTable(oldName: string, newName: string) {
-  let data: MysqlQuery = {sql: `ALTER TABLE \`${oldName}\` RENAME TO \`${newName}\`;`, params: []}
+export function QueryDropTable(table: string, ifExists: boolean = true) {
+  return new MysqlDropTableQuery(table, ifExists)
+}
+
+class MysqlRenameTableQuery {
+  private current: string
+  private newName: string
+  constructor(current: string, newName: string) {
+    this.current = current
+    this.newName = newName
+  }
+  toQuery() {
+    let data: MysqlQuery = {sql: `ALTER TABLE \`${this.current}\` RENAME TO \`${this.newName}\`;`, params: []}
   return data
+  }
+  async run(db: MysqlConnector) {
+    return await db.run(this.toQuery())
+  }
+}
+
+export function QueryRenameTable(current: string, newName: string) {
+  return new MysqlRenameTableQuery(current, newName)
 }
 
 enum MysqlAlterAction {
@@ -244,6 +278,10 @@ class MysqlAlterTableQuery {
     data.sql += `;`
     return data
   }
+
+  async run(db: MysqlConnector) {
+    return await db.run(this.toQuery())
+  }
 }
 
 export function QueryAlterTable(table: string) {
@@ -258,7 +296,8 @@ export function QueryAlterTable(table: string) {
 
 export enum MysqlOperator {
   COUNT = "COUNT",
-  DISTINCT = "DISTINCT"
+  DISTINCT = "DISTINCT",
+  SUM = "SUM"
 }
 
 export interface MysqlSelectOptions {
@@ -374,6 +413,12 @@ function qwhereParams(key: string, obj: any): MysqlQuery {
   } else if (obj["$nin"] !== undefined) {
     data.sql = `${key} NOT IN (?)`;
     data.params.push(obj["$nin"]);
+  } else if (obj["$like"] !== undefined) {
+    data.sql = `${key} LIKE ?`;
+    data.params.push(obj["$like"]);
+  } else if (obj["$nlike"] !== undefined) {
+    data.sql = `${key} NOT LIKE ?`;
+    data.params.push(obj["$like"]);
   } else {
     data.sql = `${key} = ?`;
     data.params.push(obj);
