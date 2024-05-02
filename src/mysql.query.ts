@@ -812,3 +812,54 @@ export async function QueryCount(db: MysqlConnector, table: string | MysqlTableO
     }
   }
 }
+
+export interface MysqlUpdateSetValues {
+  [column:string]: any
+}
+
+export async function QueryUpdate(db: MysqlConnector, table: string | MysqlTableOptions, setVals: MysqlUpdateSetValues, where?: MysqlWhereOptions): Promise<{changed: number, query?: MysqlQuery}> {
+  let wh = where || {}
+  let setV = setVals || {}
+  
+  let update: MysqlQuery = {sql: "", params: []}
+
+  let t: MysqlQuery = {sql: "", params: []}
+  if (typeof table == "string") {
+    t.sql += `UPDATE \`${table}\``
+  } else if (typeof table == "object") {
+    t.sql += `UPDATE \`${table.table}\``
+  }
+  update.sql += t.sql
+
+  let s: MysqlQuery = {sql: "", params: []}
+  let keys = Object.keys(setV)
+  let sIsFirst = true
+  for (let key of keys) {
+    if (sIsFirst) {
+      sIsFirst = false
+      s.sql += " SET "
+    } else {
+      s.sql += ", "
+    }
+    s.sql += `\`${key}\` = ?`
+    s.params.push(setV[key])
+  }
+  update.sql += s.sql
+  update.params.push(...s.params)
+
+  let w: MysqlQuery = {sql: "", params: []}
+  if (Object.keys(wh).length > 0) {
+    w = qwhere(wh, false)
+  }
+  update.sql += w.sql
+  update.params.push(...w.params)
+
+  update.sql += `;`
+
+  if (db == null) {
+    return {query: update, changed: 0}
+  } else {
+    let data = await db.run(update)
+    return {changed: data.result.changedRows}
+  }
+}

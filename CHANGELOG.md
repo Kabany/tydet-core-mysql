@@ -9,6 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Mysql Connector Service
 * Mysql Core Error
 * Mysql Migration Handler and Class
-* Mysql QueryBuilder: Create Table, Rename Table, Alter Table, Drop Table, Find, FindOne, Count
+* Mysql QueryBuilder: Create Table, Rename Table, Alter Table, Drop Table, Find, FindOne, Count, Update
 * Mysql Entity
 * Mysql Utils Entites Compare

@@ -361,7 +361,11 @@ let tableOptions = {table: "my_table", as: "simple_alias"}
   ]
   ```
 
+
 ## Entities
+
+As part of this module, you can create entities (or clases representing tables) as Database Access Objects for easy management to all CRUD operatios.
+
 
 ## Where Operators
 

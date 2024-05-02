@@ -1,4 +1,4 @@
-import { MysqlJoinType, QueryAlterTable, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne, QueryRenameTable } from "../src/mysql.query"
+import { MysqlJoinType, QueryAlterTable, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne, QueryRenameTable, QueryUpdate } from "../src/mysql.query"
 import { MysqlDataType } from "../src/mysql.schema"
 import { MysqlQuery } from "../src/mysql.service"
 
@@ -226,6 +226,14 @@ describe("Mysql Query", () => {
       expect(query.params[1]).toBe(10)
       expect(query.params[2]).toBe(10)
       expect(query.sql).toBe("SELECT * FROM `users` WHERE `name` = ? LIMIT ? OFFSET ?;")
+    })
+  })
+
+  describe("Update", () => {
+    it("simple update", async () => {
+      let update = await QueryUpdate(null as any, "users", {name: "Luis", lastName: "Example"}, {id: 2, email: "luis@email.com"})
+      expect(update.query!.sql).toBe("UPDATE `users` SET `name` = ?, `lastName` = ? WHERE `id` = ? AND `email` = ?;")
+      expect(update.query!.params.length).toBe(4)
     })
   })
 
