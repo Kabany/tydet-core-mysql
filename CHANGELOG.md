@@ -6,9 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.0.0] 2024-04-25
 ### Added
-* Mysql Connector Service
-* Mysql Core Error
-* Mysql Migration Handler and Class
-* Mysql QueryBuilder: Create Table, Rename Table, Alter Table, Drop Table, Find, FindOne, Count, Update
-* Mysql Entity
-* Mysql Utils Entites Compare
+* Mysql Connector Service.
+* Mysql Core Error.
+* Mysql Migration Handler and Class.
+* Mysql QueryBuilder: Create Table, Rename Table, Alter Table, Drop Table, Find, FindOne, Count, Update, Remove.
+* Mysql Entity: Find, FindOne, Count, UpdateAll, RemoveAll, insert, update, remove, populate.
+* Mysql Entity relationships: hasOne, belongsTo, hasMany, belongsToMany.
+* Mysql Utils Entites Compare.
