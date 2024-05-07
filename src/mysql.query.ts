@@ -813,6 +813,53 @@ export async function QueryCount(db: MysqlConnector, table: string | MysqlTableO
   }
 }
 
+export interface MysqlInsertSetValues {
+  [column:string]: any
+}
+
+export async function QueryInsert(db: MysqlConnector, table: string | MysqlTableOptions, setVals: MysqlInsertSetValues): Promise<{pk: any, query?: MysqlQuery}> {
+  let setV = setVals || {}
+  
+  let insert: MysqlQuery = {sql: "", params: []}
+
+  let t: MysqlQuery = {sql: "", params: []}
+  if (typeof table == "string") {
+    t.sql += `INSERT INTO \`${table}\``
+  } else if (typeof table == "object") {
+    t.sql += `INSERT INTO \`${table.table}\``
+  }
+  insert.sql += t.sql
+
+  let c: MysqlQuery = {sql: "", params: []}
+  let v: MysqlQuery = {sql: "", params: []}
+  let keys = Object.keys(setV)
+  let sIsFirst = true
+  for (let key of keys) {
+    if (sIsFirst) {
+      sIsFirst = false
+      c.sql += "("
+      v.sql += "("
+    } else {
+      c.sql += ", "
+      v.sql += ", "
+    }
+    c.sql += `\`${key}\``
+    v.sql += `?`
+    v.params.push(setV[key])
+  }
+  c.sql += ")"
+  v.sql += ")"
+  insert.sql += ` ${c.sql} VALUES ${v.sql};`
+  insert.params.push(...v.params)
+
+  if (db == null) {
+    return {query: insert, pk: null}
+  } else {
+    let data = await db.run(insert)
+    return {pk: data.result.insertId}
+  }
+}
+
 export interface MysqlUpdateSetValues {
   [column:string]: any
 }
@@ -861,5 +908,38 @@ export async function QueryUpdate(db: MysqlConnector, table: string | MysqlTable
   } else {
     let data = await db.run(update)
     return {changed: data.result.changedRows}
+  }
+}
+
+export async function QueryDelete(db: MysqlConnector, table: string | MysqlTableOptions, where: MysqlWhereOptions, force: boolean = false): Promise<{deleted: number, query?: MysqlQuery}> {
+  let wh = where || {}
+  
+  let remove: MysqlQuery = {sql: "", params: []}
+
+  let t: MysqlQuery = {sql: "", params: []}
+  if (typeof table == "string") {
+    t.sql += `DELETE FROM \`${table}\``
+  } else if (typeof table == "object") {
+    t.sql += `DELETE FROM \`${table.table}\``
+  }
+  remove.sql += t.sql
+
+  let keys = Object.keys(wh).length
+  let w: MysqlQuery = {sql: "", params: []}
+  if (keys > 0) {
+    w = qwhere(wh, false)
+  } else if (keys == 0 && !force) {
+    throw new MysqlCoreError("The 'where' condition must be included in the Query Delete method")
+  }
+  remove.sql += w.sql
+  remove.params.push(...w.params)
+
+  remove.sql += `;`
+
+  if (db == null) {
+    return {query: remove, deleted: 0}
+  } else {
+    let data = await db.run(remove)
+    return {deleted: data.result.affectedRows}
   }
 }

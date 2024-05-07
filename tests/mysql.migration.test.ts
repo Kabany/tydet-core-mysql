@@ -4,7 +4,7 @@ import { MysqlConnector } from "../src/mysql.service";
 import { MysqlJoinType, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne } from "../src/mysql.query";
 import { Context } from "tydet-core";
 
-const DB_HOST = "192.168.68.117"
+const DB_HOST = "192.168.68.119"
 const DB_USER = "core_test"
 const DB_NAME = "tydet_mysql"
 const DB_PASS = "core1234ABcde"

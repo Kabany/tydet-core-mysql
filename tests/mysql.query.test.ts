@@ -1,4 +1,4 @@
-import { MysqlJoinType, QueryAlterTable, QueryCount, QueryCreateTable, QueryDropTable, QueryFind, QueryFindOne, QueryRenameTable, QueryUpdate } from "../src/mysql.query"
+import { MysqlJoinType, QueryAlterTable, QueryCount, QueryCreateTable, QueryDelete, QueryDropTable, QueryFind, QueryFindOne, QueryInsert, QueryRenameTable, QueryUpdate } from "../src/mysql.query"
 import { MysqlDataType } from "../src/mysql.schema"
 import { MysqlQuery } from "../src/mysql.service"
 
@@ -229,11 +229,27 @@ describe("Mysql Query", () => {
     })
   })
 
+  describe("Insert", () => {
+    it("simple insert", async () => {
+      let update = await QueryInsert(null as any, "users", {name: "Luis", lastName: "Example"})
+      expect(update.query!.sql).toBe("INSERT INTO `users` (`name`, `lastName`) VALUES (?, ?);")
+      expect(update.query!.params.length).toBe(2)
+    })
+  })
+
   describe("Update", () => {
     it("simple update", async () => {
       let update = await QueryUpdate(null as any, "users", {name: "Luis", lastName: "Example"}, {id: 2, email: "luis@email.com"})
       expect(update.query!.sql).toBe("UPDATE `users` SET `name` = ?, `lastName` = ? WHERE `id` = ? AND `email` = ?;")
       expect(update.query!.params.length).toBe(4)
+    })
+  })
+
+  describe("Remove", () => {
+    it("simple remove", async () => {
+      let remove = await QueryDelete(null as any, "users", {id: 2})
+      expect(remove.query!.sql).toBe("DELETE FROM `users` WHERE `id` = ?;")
+      expect(remove.query!.params.length).toBe(1)
     })
   })
 

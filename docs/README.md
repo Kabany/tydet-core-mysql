@@ -361,6 +361,52 @@ let tableOptions = {table: "my_table", as: "simple_alias"}
   ]
   ```
 
+### `QueryInsert(db: MysqlConnector, table: string | MysqlTableOptions, setVals: MysqlInsertSetValues): Promise<{pk: any, query?: MysqlQuery}>`
+
+Builds a query object to add a row in the database using the insert statement. 
+It returns the Primary Key of the added row.
+
+* **db**: The MysqlConnector service
+* **table**: The table string name, or a instance of MysqlTableOptions where defines the table name (required) and the alias (optional). For example:
+```js
+let tableName = "my_table"
+let tableOptions = {table: "my_table", as: "simple_alias"}
+```
+* **setVals**: An object with the values to update. It is required to have at least one value to execute the update statement:
+```js
+let setVals = {firstName: "Luis", lastName: "Example"}
+```
+
+### `QueryUpdate(db: MysqlConnector, table: string | MysqlTableOptions, setVals: MysqlUpdateSetValues, where?: MysqlWhereOptions): Promise<{changed: number, query?: MysqlQuery}>`
+
+Builds a query object to update records in the database using the update statement. 
+It returns the number of affected rows.
+
+* **db**: The MysqlConnector service
+* **table**: The table string name, or a instance of MysqlTableOptions where defines the table name (required) and the alias (optional). For example:
+```js
+let tableName = "my_table"
+let tableOptions = {table: "my_table", as: "simple_alias"}
+```
+* **setVals**: An object with the values to update. It is required to have at least one value to execute the update statement:
+```js
+let setVals = {firstName: "Luis", lastName: "Example"}
+```
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+
+### `QueryDelete(db: MysqlConnector, table: string | MysqlTableOptions, where: MysqlWhereOptions, force?: boolean): Promise<{deleted: number, query: MysqlQuery}>`
+
+Builds a query object to erase records in the database using the delete statement. 
+It returns the number of affected rows and the executed query.
+
+* **db**: The MysqlConnector service
+* **table**: The table string name, or a instance of MysqlTableOptions where defines the table name (required) and the alias (optional). For example:
+```js
+let tableName = "my_table"
+let tableOptions = {table: "my_table", as: "simple_alias"}
+```
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **force**: In the case the where options is empty, then it's required to use the force. By default it's `false`.
 
 ## Entities
 
