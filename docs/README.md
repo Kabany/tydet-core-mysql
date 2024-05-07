@@ -567,6 +567,30 @@ Similar as the `QueryCount` method, it will execute a select statement with the 
   ```
 
 
+#### `Entity.UpdateAll(db: MysqlConnector, setVals: MysqlEntityUpdateSetValues, where?: MysqlWhereOptions): Promise<number>`
+
+Similar as the `QueryUpdate` method, it will execute an update statement. 
+It returns the number of added rows in the database.
+
+* **db**: The MysqlConnector service
+* **setVals**: An object with the values to update. It is required to have at least one value to execute the update statement:
+```js
+let setVals = {firstName: "Luis", lastName: "Example"}
+```
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+
+
+#### `Entity.RemoveAll(db: MysqlConnector, where: MysqlWhereOptions, force?: boolean): Promise<number>`
+
+Similar as the `QueryDelete` method, it will execute a delete statement. 
+It returns the number of deleted rows in the database.
+
+* **db**: The MysqlConnector service
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **force**: In the case the where options is empty, then it's required to use the force. By default it's `false`.
+
+
+
 ### Entity Instance methods
 
 For Entity instances (objects) other methods are available using the instance parameters as values for the entity's columns.

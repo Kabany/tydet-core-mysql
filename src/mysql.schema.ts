@@ -1086,25 +1086,26 @@ export class MysqlEntity {
   static async UpdateAll(db: MysqlConnector, setVals: MysqlEntityUpdateSetValues, where?: MysqlWhereOptions): Promise<number> {
     let wh = where || {}
     let sv = setVals || {}
-    let columns = (this.constructor as any).getColumns()
     let upt: MysqlQuery = {sql: "", params: []}
-    upt.sql = `UPDATE \`${this.getTableName()}\` SET `
-    let isFirst = true
-    let pk: MysqlEntityParameter
-    for (let column of columns) {
-      if (column.primaryKey) {
-        pk = column
-        continue
-      }
+    upt.sql = `UPDATE \`${this.getTableName()}\``
 
-      if (isFirst) {
-        isFirst = false
+    let isFirst = true
+    let pk = this.getPrimaryKey()
+    let s: MysqlQuery = {sql: "", params: []}
+    let keys = Object.keys(sv)
+    let sIsFirst = true
+    for (let key of keys) {
+      if (sIsFirst) {
+        sIsFirst = false
+        s.sql += " SET "
       } else {
-        upt.sql += ", "
+        s.sql += ", "
       }
-      upt.sql += `\`${column.columnName}\` = ?`
-      upt.params.push(sv[column.name])
+      s.sql += `\`${key}\` = ?`
+      s.params.push(sv[key])
     }
+    upt.sql += s.sql
+    upt.params.push(...s.params)
     
     let w: MysqlQuery = {sql: "", params: []}
     if (Object.keys(wh).length > 0) {
@@ -1120,6 +1121,33 @@ export class MysqlEntity {
     } else {
       let result = await db.run(upt)
       return result.result.changedRows
+    }
+  }
+
+  static async RemoveAll(db: MysqlConnector, where: MysqlWhereOptions, force: boolean = false): Promise<number> {
+    let wh = where || {}
+  
+    let remove: MysqlQuery = {sql: "", params: []}
+
+    remove.sql += `DELETE FROM \`${this.getTableName()}\``
+
+    let keys = Object.keys(wh).length
+    let w: MysqlQuery = {sql: "", params: []}
+    if (keys > 0) {
+      w = qwhere(wh, false)
+    } else if (keys == 0 && !force) {
+      throw new MysqlCoreError("The 'where' condition must be included in the Query Delete method")
+    }
+    remove.sql += w.sql
+    remove.params.push(...w.params)
+
+    remove.sql += `;`
+
+    if (db == null) {
+      return remove as any
+    } else {
+      let data = await db.run(remove)
+      return data.result.affectedRows
     }
   }
 }

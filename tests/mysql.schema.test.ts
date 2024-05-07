@@ -186,6 +186,21 @@ describe("Mysql Schema", () => {
       expect(query.params[0]).toBe("Luis")
       expect(query.sql).toBe("SELECT COUNT(`id`) AS `total` FROM `users` WHERE `name` = ?;")
     })
+    it("Entity Update query", async () => {
+      let result = await User.UpdateAll(null as any, {firstName: "Luis"}, {id: 1}) as any
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(2)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.params[1]).toBe(1)
+      expect(query.sql).toBe("UPDATE `users` SET `firstName` = ? WHERE `id` = ?;")
+    })
+    it("Entity Remove query", async () => {
+      let result = await User.RemoveAll(null as any, {name: "Luis"}) as any
+      let query = result as MysqlQuery
+      expect(query.params.length).toBe(1)
+      expect(query.params[0]).toBe("Luis")
+      expect(query.sql).toBe("DELETE FROM `users` WHERE `name` = ?;")
+    })
     it("Entity Select options", async () => {
       let result = await User.Find(null as any, {firstName: "Luis"}, {select: ["firstName", "lastName"]})
       let query = result[0]
