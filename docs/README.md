@@ -412,6 +412,366 @@ let tableOptions = {table: "my_table", as: "simple_alias"}
 
 As part of this module, you can create entities (or clases representing tables) as Database Access Objects for easy management to all CRUD operatios.
 
+### Entity Definition
+
+To define an entity class simply extend the class with the `MysqlEntity` class like the following:
+
+```js
+class User extends MysqlEntity {
+  id: number
+  firstName: string
+  lastName: string
+  createdAt: Date
+}
+
+let user = new User({firstName: "Luis", lastName: "Example"})
+user.createdAt = new Date()
+```
+
+Additional from the class, it's required to define the entity's table schema. Just use the static method `DefineSchema()`.
+In this definition it will declare the Table's name, the columns and other settings:
+
+```js
+class User extends MysqlEntity {
+  id: number
+  firstName: string
+  lastName: string
+  createdAt: Date
+}
+
+User.DefineSchema("users", {
+  id: {
+    type: MysqlDataType.INT,
+    primaryKey: true
+  },
+  firstName: MysqlDataType.VARCHAR,
+  lastName: MysqlDataType.VARCHAR,
+  createdAt: {
+    type: MysqlDataType.DATETIME,
+    required: true,
+    default: MysqlDefaultValues.DATENOW
+  }
+})
+```
+
+In the schema definition, you can set:
+
+* **Schema's Name**: The Table's name
+* **Columns**: A set of columns for the table where you can define:
+  * **type** The Column Data Type. It's a enum with the name `MysqlDataType` with the options: `VARCHAR`, `TEXT`, `LONGTEXT`, `TINYINT`, `SMALLINT`, `MEDIUMINT`, `INT`, `BIGINT`, `DECIMAL`, `DATE`, `DATETIME` and `BOOLEAN`.
+  * **required**: Similar as the `NOT NULL` statement. It will add validators to avoid updating or inserting empty values in the column. By default it is `false`.
+  * **default**: Set the default value for the column. It can accept any value including a function. You can also use the enum `MysqlDataType` to allow a predefined "on-creation" value (`NULL`, `DATENOW`, `UUIDV1` and `UUIDV4`). By default it is `null`.
+  * **columnName**: In the case that the entity parameter key is different from the column's name, then you can define it in the `columnName` property like:
+  ```js
+  {
+    createdAt: {
+      type: MysqlDataType.DATETIME,
+      default: MysqlDefaultValues.DATENOW,
+      columnName: "created_at"
+    }
+  }
+  ```
+  * **primaryKey**: Define the table's primary key. It is recommended that every table has one primary key. By default it's false.
+  * **validators**: It's an array of functions to validate the value of the column. This function needs to have an input to send the current value and returns an object with `success` for the boolean result of the validation and optionaly a `message` to send a custom error message:
+  ```js
+  let customValidation = (value: any) => {
+    let result = value != null && value.length >= 5
+    return {success: result, message: result ? null : "Invalid value"}
+  }
+  let validations = [customValidation]
+  ```
+  * **min**: This parameter will only be considered if the column data type is a number. It adds a validation that will force the column to have a value greater or equal than this option.
+  * **max**: This parameter will only be considered if the column data type is a number. It adds a validation that will force the column to have a value lower or equal than this option.
+  * **minLen**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length greather or equal than this option.
+  * **maxLen**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length lower or equal than this option.
+
+### Entity Static methods
+
+The entity class have a set of methods to easily execute CRUD operations:
+
+```js
+let users = await User.Find(db, {firstName: {$like: "L%"}})
+```
+
+#### `Entity.Find(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOptions): Promise<any[]>`
+
+Similar as the `QueryFind` method, it will fetch records from the database with a select statement.
+
+* **db**: The MysqlConnector service
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **options**: An instance of MysqlEntityFindOptions for additional operators for the query:
+  * **select**: An array of strings or MysqlSelectOptions to be included in the SELECT statement. If it is not defined or the array is empty, then the select statement will include the all columns ( * ):
+  ```js
+  let select = ["id", "name", {column: "email", as: "mail"}, {column: "total": table: "expenses", operator: MysqlOperator.SUM}]
+  ```
+  * **groupBy**: An array of strings or MysqlGroupOptions instances:
+  ```js
+  let groupBy = [
+    "categoryId", {column: "id", table: "users"}
+  ]
+  ```
+  * **orderBy**: An array of MysqlOrderOptions instances:
+  ```js
+  let orderBy = [
+   {column: "firstName", order: "ASC"},
+   {column: "age", table: "userInfo", order: "DESC"}
+  ]
+  ```
+  * **limit**: An instance to define the pagination of the query with `per` for the number of elements in the result and `page` for the pagination. The maximum number of elements is 1000. By default is the first page with 1000 elements.
+  ```js
+  let limit = {page: 1, per: 1000}
+  ```
+  * **populate** An array of entity classes to include in the result. This option will include the joins if the Schema has defined relationships with other entities. Check [Entity Relationships](#entity-relationships) for more information.
+
+
+#### `Entity.FindOne(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions): Promise<any>`
+
+Similar as the `QueryFindOne` method, it will fetch the first record from the database with a select statement.
+
+* **db**: The MysqlConnector service
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **options**: An instance of MysqlEntityFindOneOptions for additional operators for the query:
+  * **select**: An array of strings or MysqlSelectOptions to be included in the SELECT statement. If it is not defined or the array is empty, then the select statement will include the all columns ( * ):
+  ```js
+  let select = ["id", "name", {column: "email", as: "mail"}, {column: "total": table: "expenses", operator: MysqlOperator.SUM}]
+  ```
+  * **groupBy**: An array of strings or MysqlGroupOptions instances:
+  ```js
+  let groupBy = [
+    "categoryId", {column: "id", table: "users"}
+  ]
+  ```
+  * **orderBy**: An array of MysqlOrderOptions instances:
+  ```js
+  let orderBy = [
+   {column: "firstName", order: "ASC"},
+   {column: "age", table: "userInfo", order: "DESC"}
+  ]
+  ```
+  * **populate** An array of entity classes to include in the result. This option will include the joins if the Schema has defined relationships with other entities. Check [Entity Relationships](#entity-relationships) for more information.
+
+
+#### `Entity.Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityCountOptions): Promise<number>`
+
+Similar as the `QueryCount` method, it will execute a select statement with the `COUNT()` operator.
+
+* **db**: The MysqlConnector service
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **options**: An instance of MysqlFindOptions for additional operators for the query:
+  * **countBy**: Define the column to be used in the count() operator. It's mostly used for performance because it's efficient to call one column in the count() operator instead of calling the whole table like `count(*)`, which is used by default.
+  * **groupBy**: An array of strings or MysqlGroupOptions instances:
+  ```js
+  let groupBy = [
+    "categoryId", {column: "id", table: "users"}
+  ]
+  ```
+
+
+### Entity Instance methods
+
+For Entity instances (objects) other methods are available using the instance parameters as values for the entity's columns.
+
+```js
+let user = new User({firstName: "Luis", lastName: "Example"})
+user.createdAt = new Date()
+await user.insert(db) // MysqlConnection
+```
+
+#### `EntityInstance.insert(db: MysqlConnector): Promise<any>`
+
+Execute an `INSERT` statement using the values from the Entity's instance.
+It returns the Primary Key generated from the database. 
+This value is also assigned to the instance's primary key parameter.
+
+#### `EntityInstance.update(db: MysqlConnector): Promise<any>`
+
+Execute an `UPDATE` statement using the values from the Entity's instance.
+It returns the number of updated rows from the database. 
+This value should be `1`.
+
+#### `EntityInstance.remove(db: MysqlConnector): Promise<any>`
+
+Execute a `DELETE` statement using the primary key from the Entity's instance as filter.
+It returns the number of deleted rows from the database. 
+This value should be `1`.
+
+#### `EntityInstance.validate(db?: MysqlConnector): Promise<any>`
+
+Perform a validation using the column validations from the Entity Schema definitiom.
+It returns an object with parameters where the `key` is the name of the instance parameter and the `value` the error message.
+
+The default error messages can be one of the following:
+* REQUIRED
+* INVALID_TYPE
+* INVALID_VALUE
+* MAX_VALUE
+* MIN_VALUE
+* MAX_LENGTH
+* MIN_LENGTH
+
+Remember that custom error messages can be included in the Schema definition.
+
+#### `EntityInstance.populate(db: MysqlConnector): Promise<void>`
+
+It will add all relationships in the Entity instance. Check [Entity Relationships](#entity-relationships) for more information.
+
+```js
+class User extends MysqlEntity {
+  id: number
+  firstName: string
+  lastName: string
+  createdAt: string
+
+  comments?: Comment[] // -> another class
+}
+
+class Comment extends MysqlEntity {
+  id: number
+  userId: number
+  message: string
+
+  user?: User
+}
+
+User.hasMany(Comment, "userId", "comments")
+Comment.belongsTo(User, "userId", "user")
+
+let user = User.FinOne(db)
+user.comments // current value is undefined
+
+await user.populate(db)
+user.comments // an array of related comments
+```
+
+
+### Entity Relationships
+
+The entity class supports standard associations like `One-To-One`, `One-To-Many` and `Many-to-Many` relationships.
+
+To do this, you can use the following assosiations methods that should be combined to create the relationships between entities:
+
+* Has One
+* Belongs to
+* Has Many
+* Belongs to Many
+
+```js
+class A extends MysqlEntity { /* ... */ }
+class B extends MysqlEntity { /* ... */ }
+
+A.hasOne(B)     // A has one B (one-to-one where B has the foreign key of A)
+A.belongsTo(B)  // A belongs to B (one-to-one or one-to-many where A has the foreign key of B)
+A.hasMany(B)    // A has many B (one-to-many where A has the foreign key of B)
+A.belongsToMany(B, /* through */ C)   // A belongs to many B (many-to-many where C has the foreign keys of A and B)
+```
+
+#### `Entity.hasOne(entity: MysqlEntity, foreignKey: string, custom?: string)`
+
+Create a One-To-One relationship where the foreignKey is located in the remote entity:
+
+```js
+class A extends MysqlEntity {
+  id: number // Primary Key
+  /* ... */
+  customB: B
+}
+
+class B extends MysqlEntity {
+  /* ... */
+  aId: number // Foreign Key
+}
+
+A.hasOne(B, "aId", "customB") // A has one B
+```
+
+* **entity**: The entity to define an association with.
+* **foreignKey**: The name of the column that will be used as the foreign key.
+* **custom**: The name of the parameter that will be used to populate the association.
+
+
+#### `Entity.belongsTo(entity: MysqlEntity, foreignKey: string, custom?: string)`
+
+Create a One-To-One or One-To-Many relationship where the foreignKey is located in the main entity:
+
+```js
+class A extends MysqlEntity {
+  /* ... */
+  bId: number // foreign Key
+  customB: B
+}
+
+class B extends MysqlEntity {
+  id: number // Primary Key
+  /* ... */
+}
+
+A.belongsTo(B, "bId", "customB") // A belongs to B, so B can have one or many A.
+```
+
+* **entity**: The entity to define an association with.
+* **foreignKey**: The name of the column that will be used as the foreign key.
+* **custom**: The name of the parameter that will be used to populate the association.
+
+
+#### `Entity.hasMany(entity: MysqlEntity, foreignKey: string, custom?: string)`
+
+Create a One-To-Many relationship where the foreignKey is located in the remote entity:
+
+```js
+class A extends MysqlEntity {
+  id: number // Primary Key
+  /* ... */
+  customB: B[]
+}
+
+class B extends MysqlEntity {
+  /* ... */
+  aId: number // Foreign Key
+}
+
+A.hasMany(B, "aId", "customB") // A has many B
+```
+
+* **entity**: The entity to define an association with.
+* **foreignKey**: The name of the column that will be used as the foreign key.
+* **custom**: The name of the parameter that will be used to populate the association.
+
+
+#### `Entity.belongsToMany(entity: MysqlEntity, through: MysqlEntity, foreignKey: string, custom?: string)`
+
+Create a Many-To-Many relationship where the foreignKey is located in the "middle" entity:
+
+```js
+class A extends MysqlEntity {
+  id: number // A Primary Key
+  /* ... */
+  customB: B[]
+}
+
+class B extends MysqlEntity {
+  id: number // B Primary Key
+  /* ... */
+  customA: A[]
+}
+
+class C extends MysqlEntity {
+  aId: number // Foreign Key 1
+  bId: number // Foreign Key 2
+}
+
+A.belongsToMany(B, C, "aId", "customB") // A belongs to B through C, so A can have many B as B can have many A.
+B.belongsToMany(A, C, "bId", "customA") // B belongs to A through C, so B can have many A as A can have many B.
+C.belongsTo(A, "aId")
+C.belongsTo(B, "bId")
+```
+
+It's important that the "middle" entity must define the association with the main and remote entities to match the relationship. Otherwise it will throw an error.
+
+* **entity**: The entity to define an association with.
+* **through**: The "middle" entity that will have the foreign keys of the main and remote entities.
+* **foreignKey**: The name of the column that will be used as the foreign key.
+* **custom**: The name of the parameter that will be used to populate the association.
+
 
 ## Where Operators
 

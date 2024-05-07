@@ -129,6 +129,10 @@ export interface MysqlEntityCountOptions {
   groupBy?: (string | MysqlGroupOptions)[]
 }
 
+export interface MysqlEntityUpdateSetValues {
+  [columns: string]: any
+}
+
 
 
 
@@ -1076,6 +1080,46 @@ export class MysqlEntity {
       } else {
         return 0
       }
+    }
+  }
+
+  static async UpdateAll(db: MysqlConnector, setVals: MysqlEntityUpdateSetValues, where?: MysqlWhereOptions): Promise<number> {
+    let wh = where || {}
+    let sv = setVals || {}
+    let columns = (this.constructor as any).getColumns()
+    let upt: MysqlQuery = {sql: "", params: []}
+    upt.sql = `UPDATE \`${this.getTableName()}\` SET `
+    let isFirst = true
+    let pk: MysqlEntityParameter
+    for (let column of columns) {
+      if (column.primaryKey) {
+        pk = column
+        continue
+      }
+
+      if (isFirst) {
+        isFirst = false
+      } else {
+        upt.sql += ", "
+      }
+      upt.sql += `\`${column.columnName}\` = ?`
+      upt.params.push(sv[column.name])
+    }
+    
+    let w: MysqlQuery = {sql: "", params: []}
+    if (Object.keys(wh).length > 0) {
+      w = qwhere(wh, false)
+    }
+    upt.sql += w.sql
+    upt.params.push(...w.params)
+
+    upt.sql += ";"
+
+    if (db == null) {
+      return upt as any
+    } else {
+      let result = await db.run(upt)
+      return result.result.changedRows
     }
   }
 }
