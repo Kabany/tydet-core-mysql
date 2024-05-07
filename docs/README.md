@@ -689,7 +689,7 @@ A.hasMany(B)    // A has many B (one-to-many where A has the foreign key of B)
 A.belongsToMany(B, /* through */ C)   // A belongs to many B (many-to-many where C has the foreign keys of A and B)
 ```
 
-#### `Entity.hasOne(entity: MysqlEntity, foreignKey: string, custom?: string)`
+#### `Entity.hasOne(entity: typeof MysqlEntity, foreignKey: string, custom?: string)`
 
 Create a One-To-One relationship where the foreignKey is located in the remote entity:
 
@@ -713,7 +713,7 @@ A.hasOne(B, "aId", "customB") // A has one B
 * **custom**: The name of the parameter that will be used to populate the association.
 
 
-#### `Entity.belongsTo(entity: MysqlEntity, foreignKey: string, custom?: string)`
+#### `Entity.belongsTo(entity: typeof MysqlEntity, foreignKey: string, custom?: string)`
 
 Create a One-To-One or One-To-Many relationship where the foreignKey is located in the main entity:
 
@@ -737,7 +737,7 @@ A.belongsTo(B, "bId", "customB") // A belongs to B, so B can have one or many A.
 * **custom**: The name of the parameter that will be used to populate the association.
 
 
-#### `Entity.hasMany(entity: MysqlEntity, foreignKey: string, custom?: string)`
+#### `Entity.hasMany(entity: typeof MysqlEntity, foreignKey: string, custom?: string)`
 
 Create a One-To-Many relationship where the foreignKey is located in the remote entity:
 
@@ -761,7 +761,7 @@ A.hasMany(B, "aId", "customB") // A has many B
 * **custom**: The name of the parameter that will be used to populate the association.
 
 
-#### `Entity.belongsToMany(entity: MysqlEntity, through: MysqlEntity, foreignKey: string, custom?: string)`
+#### `Entity.belongsToMany(entity: typeof MysqlEntity, through: typeof MysqlEntity, foreignKey: string, custom?: string)`
 
 Create a Many-To-Many relationship where the foreignKey is located in the "middle" entity:
 
@@ -881,3 +881,19 @@ let where = {name: {"$nlike": "Lu%"}} // name NOT LIKE "Lu%" (all string not sta
 ```
 
 ## Utils
+
+This module will include methos that can be used to execute class level operations like:
+
+### `entitiesMatch(ent1: MysqlEntity, ent2: MysqlEntity): boolean`
+
+Used to compare two entity instances by comparing the values of its parameters:
+
+```js
+let user1 = new User({firstName: "Luis"})
+let user2 = new User()
+user2.firstName = "Luis"
+entitiesMatch(user1, user2)   // true
+
+user1.email = "test@email.com"
+entitiesMatch(user1, user2)   // false
+```
