@@ -1,6 +1,6 @@
 import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
-import { MysqlCoreError, MysqlEntityValidationError } from "./mysql.error"
+import { MysqlCoreError, MysqlEntityNotFound, MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
 import { MysqlGroupOptions, MysqlOperator, MysqlOrderOptions, MysqlSelectOptions, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 import { entitiesMatch } from "./mysql.utils"
@@ -1030,6 +1030,17 @@ export class MysqlEntity {
       } else {
         return null
       }
+    }
+  }
+
+  static async FindOneOrThrow(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions): Promise<any> {
+    let result = await this.FindOne(db, where, options)
+    if (result == null) {
+      let table = this.getTableName()
+      let pk = this.getPrimaryKey()
+      throw new MysqlEntityNotFound("Entity not found", table, pk, where)
+    } else {
+      return result
     }
   }
 

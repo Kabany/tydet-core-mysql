@@ -1,6 +1,6 @@
 {
   "name": "tydet-core-mysql",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "TyDeT Core MySQL is a Typescript & Javascript library for TyDeT Core to handle connections with a MySQL Database.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

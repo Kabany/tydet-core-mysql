@@ -550,6 +550,31 @@ Similar as the `QueryFindOne` method, it will fetch the first record from the da
   ```
   * **populate** An array of entity classes to include in the result. This option will include the joins if the Schema has defined relationships with other entities. Check [Entity Relationships](#entity-relationships) for more information.
 
+#### `Entity.FindOneOrThrow(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityFindOneOptions): Promise<any>`
+
+Similar as the `QueryFindOne` method, it will fetch the first record from the database with a select statement. This method will throw an `MysqlEntityNotFound` exception if item is not found.
+
+* **db**: The MysqlConnector service
+* **where**: An object to define the `where` filters in the select statement. Check the [Where Operators](#where-operators) section for more details.
+* **options**: An instance of MysqlEntityFindOneOptions for additional operators for the query:
+  * **select**: An array of strings or MysqlSelectOptions to be included in the SELECT statement. If it is not defined or the array is empty, then the select statement will include the all columns ( * ):
+  ```js
+  let select = ["id", "name", {column: "email", as: "mail"}, {column: "total": table: "expenses", operator: MysqlOperator.SUM}]
+  ```
+  * **groupBy**: An array of strings or MysqlGroupOptions instances:
+  ```js
+  let groupBy = [
+    "categoryId", {column: "id", table: "users"}
+  ]
+  ```
+  * **orderBy**: An array of MysqlOrderOptions instances:
+  ```js
+  let orderBy = [
+   {column: "firstName", order: "ASC"},
+   {column: "age", table: "userInfo", order: "DESC"}
+  ]
+  ```
+  * **populate** An array of entity classes to include in the result. This option will include the joins if the Schema has defined relationships with other entities. Check [Entity Relationships](#entity-relationships) for more information.
 
 #### `Entity.Count(db: MysqlConnector, where?: MysqlWhereOptions, options?: MysqlEntityCountOptions): Promise<number>`
 

@@ -1,4 +1,5 @@
 import { CoreError } from "tydet-core";
+import { MysqlWhereOptions } from "./mysql.query";
 
 export class MysqlCoreError extends CoreError {
   name: string
@@ -25,6 +26,24 @@ export class MysqlEntityValidationError extends MysqlCoreError {
     this.name = "MysqlEntityValidationError";
     this.message = message;
     this.errors = errors;
+    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+  }
+}
+
+export class MysqlEntityNotFound extends MysqlCoreError {
+  name: string
+  errors: any
+  table: string
+  pk: string
+  where: any
+
+  constructor(message: string, table: string, pk: string, where: MysqlWhereOptions) {
+    super(message);
+    this.name = "MysqlEntityNotFound";
+    this.message = message + ` -- Table: ${table}, pk: ${pk}, where: ${where}`;
+    this.table = table;
+    this.pk = pk;
+    this.where = where;
     this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
   }
 }
