@@ -24,7 +24,9 @@ User.DefineSchema("users", {
     required: true
   },
   email: {
-    type: MysqlDataType.VARCHAR
+    type: MysqlDataType.VARCHAR,
+    minLength: 3,
+    maxLength: 10
   }
 })
 
@@ -45,7 +47,9 @@ Comment.DefineSchema("comments", {
   },
   userId: {
     type: MysqlDataType.INT,
-    required: true
+    required: true,
+    min: 10,
+    max: 20
   },
   message: MysqlDataType.VARCHAR,
   createdAt: {
@@ -159,6 +163,54 @@ describe("Mysql Schema", () => {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.lastName).toBeUndefined()
         expect(err.errors.id).toBe("REQUIRED")
+      }
+
+      try {
+        let u = new User({firstName: "First", email: "as"})
+        let result = await u.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.email).toBe("MIN_LENGTH")
+      }
+
+      try {
+        let u = new User({firstName: "First", email: "12345678910"})
+        let result = await u.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.email).toBe("MAX_LENGTH")
+      }
+
+      try {
+        let u = new User({firstName: "First", email: "12345"})
+        let result = await u.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.email).toBeUndefined()
+      }
+
+      try {
+        let c = new Comment({userId: 8})
+        let result = await c.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.userId).toBe("MIN_VALUE")
+      }
+
+      try {
+        let c = new Comment({userId: 21})
+        let result = await c.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.userId).toBe("MAX_VALUE")
+      }
+
+      try {
+        let c = new Comment({})
+        let result = await c.insert(null as any)
+      } catch(err) {
+        expect(err.name).toBe("MysqlEntityValidationError")
+        expect(err.errors.userId).toBe("REQUIRED")
       }
     })
     it("Entity Find query", async () => {

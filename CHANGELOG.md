@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.3] PENDING
+### Fix
+* Rename minLen to minLength and maxLen to maxLength
+* Skip validation for null values for min and max values if the column is not required.
+* Refactor parameter validations in the entity schema definition
+
 ## [v1.0.2] 2025-01-28
 ### Added
 * Add FindOneOrThrow method to throw an exception if item not found.

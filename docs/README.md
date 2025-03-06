@@ -482,8 +482,8 @@ In the schema definition, you can set:
   ```
   * **min**: This parameter will only be considered if the column data type is a number. It adds a validation that will force the column to have a value greater or equal than this option.
   * **max**: This parameter will only be considered if the column data type is a number. It adds a validation that will force the column to have a value lower or equal than this option.
-  * **minLen**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length greather or equal than this option.
-  * **maxLen**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length lower or equal than this option.
+  * **minLength**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length greather or equal than this option. If the value is `null`, the length will be considered as `0`. The validation will be ignored if the value is `null` and is not required.
+  * **maxLength**: This parameter will only be considered if the column data type is a string. It adds a validation that will force the column to have a length lower or equal than this option. If the value is `null`, the length will be considered as `0`. The validation will be ignored if the value is `null` and is not required.
 
 ### Entity Static methods
 
