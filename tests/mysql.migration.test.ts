@@ -82,7 +82,8 @@ Actor.DefineSchema("actors", {
   },
   name: {
     type: MysqlDataType.VARCHAR,
-    required: true
+    required: true,
+    unique: true
   }
 })
 
@@ -309,6 +310,17 @@ describe("Mysql Migration", () => {
     await movie3.insert(db)
     let movie4 = new Movie({title: "The movie 4"})
     await movie4.insert(db)
+    // actor validate unique
+    let actor4 = new Actor({name: "Daniel"})
+    try {
+      await actor4.insert(db)
+    } catch(err) {
+      expect(err.name).toBe("MysqlEntityValidationError")
+      expect(err.errors.name).toBe("UNIQUE")
+    }
+    let countActors = await Actor.Count(db)
+    expect(countActors).toBe(3)
+
     // set relations
     let cast1a = new Cast({actorId: actor1.id, movieId: movie1.id})
     let cast1b = new Cast({actorId: actor2.id, movieId: movie1.id})

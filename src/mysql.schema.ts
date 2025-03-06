@@ -1,6 +1,6 @@
 import { StringUtils, DateUtils } from "tydet-utils"
 import { v1, v4 } from "uuid"
-import { MysqlCoreError, MysqlEntityNotFound, MysqlEntityValidationError } from "./mysql.error"
+import { MysqlCoreError, MysqlEntityDefinitionError, MysqlEntityNotFound, MysqlEntityValidationError } from "./mysql.error"
 import { MysqlConnector, MysqlQuery } from "./mysql.service"
 import { MysqlGroupOptions, MysqlOperator, MysqlOrderOptions, MysqlSelectOptions, MysqlWhereOptions, qgroupby, qlimit, qorderby, qselect, qwhere } from "./mysql.query"
 import { entitiesMatch } from "./mysql.utils"
@@ -38,7 +38,8 @@ export enum MysqlValidationError {
   MAX_VALUE = "MAX_VALUE",
   MIN_VALUE = "MIN_VALUE",
   MAX_LENGTH = "MAX_LENGTH",
-  MIN_LENGTH = "MIN_LENGTH"
+  MIN_LENGTH = "MIN_LENGTH",
+  UNIQUE = "UNIQUE"
 }
 
 export interface MysqlEntityParameter {
@@ -349,8 +350,10 @@ export class MysqlEntity {
           unique: data.unique === true,
           validators: []
         }
-        if (data.primaryKey === true) {
+        if (primaryKey == null && data.primaryKey === true) {
           primaryKey = column
+        } else if (primaryKey != null && data.primaryKey === true) {
+          throw new MysqlEntityDefinitionError("This Schema definition has more than one Primary Key")
         }
         parameter.validators = EntityParameterValidationDefinitionHelper(parameter, data)
         parameters.push(parameter)
@@ -361,14 +364,15 @@ export class MysqlEntity {
       this.getPrimaryKey = () => {
         return primaryKey
       }
+    } else {
+      throw new MysqlEntityDefinitionError("This Schema definition is missing a Primary Key")
     }
 
     this.getColumns = () => {
       return parameters
     }
 
-    // TODO: Add unique validation
-    // TODO: Validate that the PK is required and is no more than one
+    // Unique validation is on the Entity's instance validation() method.
 
     return this
   }
@@ -663,7 +667,16 @@ export class MysqlEntity {
         }
       }
       if (errors[column.name] == null && column.unique === true) {
-        // TODO ?? validation for unique columns
+        let where = {}
+        where[column.name] = this[column.name]
+        if (!options.insert) {
+          let pk = (this.constructor as any).getPrimaryKey()
+          where[pk] = {"$not": this[pk]}
+        }
+        let exist = await (this.constructor as any).FindOne(db, where)
+        if (exist != null) {
+          errors[column.name] = MysqlValidationError.UNIQUE
+        }
       } else if (errors[column.name] == MysqlValidationError.REQUIRED && column.primaryKey == true && options.insert) {
         // skip
         delete errors[column.name]

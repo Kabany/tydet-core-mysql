@@ -17,6 +17,18 @@ export class MysqlCoreError extends CoreError {
   }
 }
 
+export class MysqlEntityDefinitionError extends MysqlCoreError {
+  name: string
+  errors: any
+
+  constructor(message: string) {
+    super(message);
+    this.name = "MysqlEntityDefinitionError";
+    this.message = message;
+    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+  }
+}
+
 export class MysqlEntityValidationError extends MysqlCoreError {
   name: string
   errors: any

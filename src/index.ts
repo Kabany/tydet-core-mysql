@@ -1,4 +1,4 @@
-export { MysqlCoreError } from "./mysql.error"
+export { MysqlCoreError, MysqlEntityDefinitionError, MysqlEntityNotFound, MysqlEntityValidationError } from "./mysql.error"
 export { MysqlQuery, MysqlStatusCallback, MysqlConnector } from "./mysql.service"
 export { entitiesMatch } from "./mysql.utils"
 export { MysqlMigration, MysqlMigrationHandler } from "./mysql.migration"
