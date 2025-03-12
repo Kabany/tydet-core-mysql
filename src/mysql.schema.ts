@@ -65,7 +65,7 @@ interface MysqlEntityColumn {
   columnName?: string,
   primaryKey?: boolean,
   unique?: boolean
-  validators?: ((data: any) => boolean | MysqlParameterValidation)[]
+  validators?: ((data: any) => MysqlParameterValidation)[]
 }
 
 interface MysqlEntityStringColumn extends MysqlEntityColumn {
@@ -348,14 +348,14 @@ export class MysqlEntity {
           primaryKey: data.primaryKey === true,
           columnName: data.columnName || column,
           unique: data.unique === true,
-          validators: []
+          validators: data.validators || []
         }
         if (primaryKey == null && data.primaryKey === true) {
           primaryKey = column
         } else if (primaryKey != null && data.primaryKey === true) {
           throw new MysqlEntityDefinitionError("This Schema definition has more than one Primary Key")
         }
-        parameter.validators = EntityParameterValidationDefinitionHelper(parameter, data)
+        parameter.validators.push(...EntityParameterValidationDefinitionHelper(parameter, data))
         parameters.push(parameter)
       }
     }
