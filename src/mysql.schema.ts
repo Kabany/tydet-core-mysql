@@ -409,7 +409,7 @@ export class MysqlEntity {
               (this as any)[column.name] = column.default
             }
           }
-        } else if ([MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.DECIMAL].indexOf(data.type) >= 0) {
+        } else if ([MysqlDataType.TINYINT, MysqlDataType.SMALLINT, MysqlDataType.MEDIUMINT, MysqlDataType.INT, MysqlDataType.BIGINT, MysqlDataType.DECIMAL].indexOf(column.type) >= 0) {
           if ((this as any)[column.name] === null || (this as any)[column.name] === undefined) {
             if (typeof column.default == "function") {
               (this as any)[column.name] = column.default()
@@ -417,7 +417,7 @@ export class MysqlEntity {
               (this as any)[column.name] = column.default
             }
           }
-        } else if ([MysqlDataType.VARCHAR, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(data.type) >= 0) {
+        } else if ([MysqlDataType.VARCHAR, MysqlDataType.TEXT, MysqlDataType.LONGTEXT].indexOf(column.type) >= 0) {
           if ((this as any)[column.name] === null || (this as any)[column.name] === undefined) {
             if (typeof column.default == "function") {
               (this as any)[column.name] = column.default()
