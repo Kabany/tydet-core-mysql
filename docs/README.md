@@ -372,7 +372,7 @@ It returns the Primary Key of the added row.
 let tableName = "my_table"
 let tableOptions = {table: "my_table", as: "simple_alias"}
 ```
-* **setVals**: An object with the values to update. It is required to have at least one value to execute the update statement:
+* **setVals**: An object with the values to add. It is required to have at least one value to execute the insert statement:
 ```js
 let setVals = {firstName: "Luis", lastName: "Example"}
 ```
@@ -657,6 +657,7 @@ The default error messages can be one of the following:
 * MIN_VALUE
 * MAX_LENGTH
 * MIN_LENGTH
+* UNIQUE
 
 Remember that custom error messages can be included in the Schema definition.
 

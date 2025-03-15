@@ -310,10 +310,12 @@ describe("Mysql Migration", () => {
     await movie3.insert(db)
     let movie4 = new Movie({title: "The movie 4"})
     await movie4.insert(db)
+    
     // actor validate unique
     let actor4 = new Actor({name: "Daniel"})
     try {
       await actor4.insert(db)
+      fail()
     } catch(err) {
       expect(err.name).toBe("MysqlEntityValidationError")
       expect(err.errors.name).toBe("UNIQUE")

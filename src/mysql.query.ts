@@ -611,6 +611,9 @@ export function qorderby(options?: MysqlOrderOptions[]) {
 }
 
 export function qlimit(per = 100, page = 1): MysqlQuery {
+  if (per > 1000) {
+    per = 1000
+  }
   let data: MysqlQuery = {sql: " LIMIT ? OFFSET ?", params: [per, (per * (page - 1))]}
   return data;
 }

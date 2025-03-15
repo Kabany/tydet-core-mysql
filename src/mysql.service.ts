@@ -16,7 +16,7 @@ export interface MysqlQuery {
   nested?: boolean
 }
 
-export type MysqlStatusCallback = (configurations: {host, port, user, name}) => void
+export type MysqlStatusCallback = (configurations: {host, port, user, database}) => void
 
 const DB_HOST = "DB_HOST";
 const DB_PORT = "DB_PORT";
@@ -57,11 +57,27 @@ export class MysqlConnector extends Service {
         }
       });
     });
+    if (this.onConnected != null) {
+      this.onConnected({
+        host: this.params.get(DB_HOST),
+        database: this.params.get(DB_NAME),
+        port: this.params.get(DB_PORT),
+        user: this.params.get(DB_USER),
+      })
+    }
   }
 
   async disconnect() {
     if (this.connection != null) {
       this.connection.destroy();
+      if (this.onDisconnected != null) {
+        this.onDisconnected({
+          host: this.params.get(DB_HOST),
+          database: this.params.get(DB_NAME),
+          port: this.params.get(DB_PORT),
+          user: this.params.get(DB_USER),
+        })
+      }
     }
   }
 

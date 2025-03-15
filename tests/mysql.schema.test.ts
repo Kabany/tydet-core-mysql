@@ -143,6 +143,7 @@ describe("Mysql Schema", () => {
       })
       try {
         let result = await user.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.lastName).toBe("REQUIRED")
@@ -151,6 +152,7 @@ describe("Mysql Schema", () => {
 
       try {
         let result = await user.update(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.lastName).toBe("REQUIRED")
@@ -159,6 +161,7 @@ describe("Mysql Schema", () => {
 
       try {
         let result = await user.remove(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.lastName).toBeUndefined()
@@ -168,6 +171,7 @@ describe("Mysql Schema", () => {
       try {
         let u = new User({firstName: "First", email: "as"})
         let result = await u.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.email).toBe("MIN_LENGTH")
@@ -176,6 +180,7 @@ describe("Mysql Schema", () => {
       try {
         let u = new User({firstName: "First", email: "12345678910"})
         let result = await u.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.email).toBe("MAX_LENGTH")
@@ -184,6 +189,7 @@ describe("Mysql Schema", () => {
       try {
         let u = new User({firstName: "First", email: "12345"})
         let result = await u.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.email).toBeUndefined()
@@ -192,6 +198,7 @@ describe("Mysql Schema", () => {
       try {
         let c = new Comment({userId: 8})
         let result = await c.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.userId).toBe("MIN_VALUE")
@@ -200,6 +207,7 @@ describe("Mysql Schema", () => {
       try {
         let c = new Comment({userId: 21})
         let result = await c.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.userId).toBe("MAX_VALUE")
@@ -208,6 +216,7 @@ describe("Mysql Schema", () => {
       try {
         let c = new Comment({})
         let result = await c.insert(null as any)
+        fail()
       } catch(err) {
         expect(err.name).toBe("MysqlEntityValidationError")
         expect(err.errors.userId).toBe("REQUIRED")

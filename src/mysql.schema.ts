@@ -53,7 +53,7 @@ export interface MysqlEntityParameter {
   validators: ((value: any) => MysqlParameterValidation)[]
 }
 
-interface MysqlParameterValidation {
+export interface MysqlParameterValidation {
   success: boolean
   message?: string
 }
@@ -348,7 +348,7 @@ export class MysqlEntity {
           primaryKey: data.primaryKey === true,
           columnName: data.columnName || column,
           unique: data.unique === true,
-          validators: data.validators || []
+          validators: []
         }
         if (primaryKey == null && data.primaryKey === true) {
           primaryKey = column
@@ -356,6 +356,7 @@ export class MysqlEntity {
           throw new MysqlEntityDefinitionError("This Schema definition has more than one Primary Key")
         }
         parameter.validators.push(...EntityParameterValidationDefinitionHelper(parameter, data))
+        parameter.validators.push(...(data.validators || []))
         parameters.push(parameter)
       }
     }
@@ -662,16 +663,16 @@ export class MysqlEntity {
           errors[column.name] = MysqlValidationError.INVALID_VALUE
           break
         } else if ((result as MysqlParameterValidation).success == false) {
-          errors[column.name] = (result as MysqlParameterValidation).message || MysqlValidationError.INVALID_VALUE
+          errors[column.name] = (result as MysqlParameterValidation).message ? (result as MysqlParameterValidation).message : MysqlValidationError.INVALID_VALUE
           break
         }
       }
       if (errors[column.name] == null && column.unique === true) {
         let where = {}
-        where[column.name] = this[column.name]
+        where[column.columnName] = this[column.name]
         if (!options.insert) {
           let pk = (this.constructor as any).getPrimaryKey()
-          where[pk] = {"$not": this[pk]}
+          where[pk] = {"$neq": this[pk]}
         }
         let exist = await (this.constructor as any).FindOne(db, where)
         if (exist != null) {
