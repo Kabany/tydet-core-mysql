@@ -51,6 +51,6 @@ export class MysqlEntityNotFound extends MysqlCoreError {
     this.table = table
     this.where = where
     this.message = message + ` -- Table: ${this.table}, pk: ${this.pk}, where: ${this.where}`;
-    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityValidationError);
+    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityNotFound);
   }
 }
