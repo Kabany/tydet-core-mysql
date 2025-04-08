@@ -923,3 +923,28 @@ entitiesMatch(user1, user2)   // true
 user1.email = "test@email.com"
 entitiesMatch(user1, user2)   // false
 ```
+
+
+### MySQL Callbacks
+
+The are some callbacks that you can define on the configuration of this service. The callbacks are called for the following events:
+
+#### `onConnected(dbNAme: string, host: string, port: number, service: MysqlConnector, context: Context) => void`
+
+- **dbName**: The DB name defined in the connection settings
+- **host**: The host defined in the connection settings
+- **port**: The port defined in the connection settings
+- **service**: The MySQL Connector Service.
+- **context**: The TyDeT Context.
+
+This callback is executed when the MySQL connection is ready.
+
+#### `onDisconnected(dbName: string, host: string, port: number, service: MysqlConnector, context: Context) => void`
+
+- **dbName**: The DB name defined in the connection settings
+- **host**: The host defined in the connection settings
+- **port**: The port defined in the connection settings
+- **service**: The MySQL Connector Service.
+- **context**: The TyDeT Context.
+
+This callback is executed when the MySQL connection is closed.

@@ -353,7 +353,7 @@ export class MysqlEntity {
         if (primaryKey == null && data.primaryKey === true) {
           primaryKey = column
         } else if (primaryKey != null && data.primaryKey === true) {
-          throw new MysqlEntityDefinitionError("This Schema definition has more than one Primary Key")
+          throw new MysqlEntityDefinitionError(`The Schema definition for '${table}' has more than one Primary Key`)
         }
         parameter.validators.push(...EntityParameterValidationDefinitionHelper(parameter, data))
         parameter.validators.push(...(data.validators || []))
@@ -366,7 +366,7 @@ export class MysqlEntity {
         return primaryKey
       }
     } else {
-      throw new MysqlEntityDefinitionError("This Schema definition is missing a Primary Key")
+      throw new MysqlEntityDefinitionError(`This Schema definition for '${table}' is missing a Primary Key`)
     }
 
     this.getColumns = () => {

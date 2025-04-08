@@ -16,7 +16,7 @@ export interface MysqlQuery {
   nested?: boolean
 }
 
-export type MysqlStatusCallback = (configurations: {host, port, user, database}) => void
+export type MysqlConnectionCallback = (dbName: string, host: string, port: number, service: MysqlConnector, context: Context) => void
 
 const DB_HOST = "DB_HOST";
 const DB_PORT = "DB_PORT";
@@ -27,8 +27,8 @@ const DB_NAME = "DB_NAME";
 export class MysqlConnector extends Service {
   connection: mysql.Connection
 
-  onConnected: MysqlStatusCallback
-  onDisconnected: MysqlStatusCallback
+  onConnected: MysqlConnectionCallback
+  onDisconnected: MysqlConnectionCallback
 
   constructor(params: MysqlParamsInterface) {
     let map = new Map()
@@ -57,27 +57,11 @@ export class MysqlConnector extends Service {
         }
       });
     });
-    if (this.onConnected != null) {
-      this.onConnected({
-        host: this.params.get(DB_HOST),
-        database: this.params.get(DB_NAME),
-        port: this.params.get(DB_PORT),
-        user: this.params.get(DB_USER),
-      })
-    }
   }
 
   async disconnect() {
     if (this.connection != null) {
       this.connection.destroy();
-      if (this.onDisconnected != null) {
-        this.onDisconnected({
-          host: this.params.get(DB_HOST),
-          database: this.params.get(DB_NAME),
-          port: this.params.get(DB_PORT),
-          user: this.params.get(DB_USER),
-        })
-      }
     }
   }
 
@@ -112,10 +96,69 @@ export class MysqlConnector extends Service {
 
   override async onMount() {
     await this.connect()
+    await super.onMount()
   }
 
-  override async beforeUnmount() {
+  override async afterMount() {
+    if (this.onConnected){
+      this.onConnected(
+        this.params.get(DB_NAME),
+        this.params.get(DB_HOST),
+        this.params.get(DB_PORT) as number,
+        this,
+        this.context
+      )
+    }
+    await super.afterMount()
+  }
+
+  override async beforeReset() {
     await this.disconnect()
+    if (this.onDisconnected){
+      this.onDisconnected(
+        this.params.get(DB_NAME),
+        this.params.get(DB_HOST),
+        this.params.get(DB_PORT) as number,
+        this,
+        this.context
+      )
+    }
+    await super.beforeReset()
+  }
+
+  override async onReset() {
+    await this.connect()
+    await super.onReset()
+  }
+
+  override async afterReset() {
+    if (this.onConnected){
+      this.onConnected(
+        this.params.get(DB_NAME),
+        this.params.get(DB_HOST),
+        this.params.get(DB_PORT) as number,
+        this,
+        this.context
+      )
+    }
+  }
+
+  override async onEject() {
+    await this.disconnect()
+    await super.onEject()
+  }
+
+  override async afterEject() {
+    if (this.onDisconnected){
+      this.onDisconnected(
+        this.params.get(DB_NAME),
+        this.params.get(DB_HOST),
+        this.params.get(DB_PORT) as number,
+        this,
+        this.context
+      )
+    }
+    await super.afterEject()
   }
 
   getName() {

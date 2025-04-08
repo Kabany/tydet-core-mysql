@@ -2,60 +2,55 @@ import { CoreError } from "tydet-core";
 import { MysqlWhereOptions } from "./mysql.query";
 
 export class MysqlCoreError extends CoreError {
-  name: string
   sql: string
 
   constructor(message?: string, sql?: string) {
-    super(message);
-    this.name = "MysqlCoreError";
-    this.message = message;
+    super();
+    Object.setPrototypeOf(this, MysqlCoreError.prototype);
+    this.name = this.constructor.name
+    this.message = message + (sql != null ? `-- Query: ${sql}` : "")
     this.sql = sql;
-    if (sql != null && message != null) {
-      this.message += `\nSQL Query: ${this.sql}`
-    }
-    this.stack = (new Error(this.message)).stack;  //`${this.message}\n${new Error().stack}`;
+    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlCoreError);
   }
 }
 
 export class MysqlEntityDefinitionError extends MysqlCoreError {
-  name: string
-  errors: any
 
   constructor(message: string) {
-    super(message);
-    this.name = "MysqlEntityDefinitionError";
-    this.message = message;
-    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+    super();
+    Object.setPrototypeOf(this, MysqlEntityDefinitionError.prototype);
+    this.name = this.constructor.name
+    this.message = message
+    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityDefinitionError);
   }
 }
 
 export class MysqlEntityValidationError extends MysqlCoreError {
-  name: string
   errors: any
 
   constructor(message: string, errors: any) {
-    super(message);
-    this.name = "MysqlEntityValidationError";
-    this.message = message;
-    this.errors = errors;
-    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+    super();
+    Object.setPrototypeOf(this, MysqlEntityValidationError.prototype);
+    this.name = this.constructor.name
+    this.message = message
+    this.errors = errors
+    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityValidationError);
   }
 }
 
 export class MysqlEntityNotFound extends MysqlCoreError {
-  name: string
-  errors: any
   table: string
   pk: string
   where: any
 
   constructor(message: string, table: string, pk: string, where: MysqlWhereOptions) {
-    super(message);
-    this.name = "MysqlEntityNotFound";
-    this.message = message + ` -- Table: ${table}, pk: ${pk}, where: ${where}`;
-    this.table = table;
-    this.pk = pk;
-    this.where = where;
-    this.stack = (new Error(message)).stack;  //`${this.message}\n${new Error().stack}`;
+    super();
+    Object.setPrototypeOf(this, MysqlEntityNotFound.prototype);
+    this.name = this.constructor.name
+    this.pk = pk
+    this.table = table
+    this.where = where
+    this.message = message + ` -- Table: ${this.table}, pk: ${this.pk}, where: ${this.where}`;
+    if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityValidationError);
   }
 }

@@ -1,8 +1,8 @@
-import { Context, Service } from "tydet-core";
-import { LogLevel, Logger, LoggerMode } from "tydet-core-logger";
+import { Context } from "tydet-core";
 import { MysqlConnector } from "./mysql.service";
 import { MysqlDataType, MysqlDefaultValues, MysqlEntity } from "./mysql.schema";
 import { QueryCreateTable } from "./mysql.query";
+import { MysqlCoreError } from "./mysql.error";
 
 export class MysqlMigration {
   async up(_db: MysqlConnector): Promise<void> {
@@ -37,10 +37,14 @@ MysqlMigrationHistory.DefineSchema(MIGRATION_HISTORY_TABLE, {
   }
 })
 
+export type MysqlMigrationStatusCallback = (context: Context, dbName: string, message: string, err?: any) => void
+
 export class MysqlMigrationHandler {
   protected context: Context
   protected db: MysqlConnector
   protected migrations: (typeof MysqlMigration)[]
+
+  onStatusUpdate: MysqlMigrationStatusCallback
 
   constructor(db: MysqlConnector, migrations: (typeof MysqlMigration)[], context?: Context) {
     this.context = context
@@ -48,30 +52,8 @@ export class MysqlMigrationHandler {
     this.migrations = migrations
   }
 
-  private loadLogger() {
-    let l = this.context.getServiceSafe("logger")
-    if (l == null) {
-      if (this.context != null) {
-        let logger = new Logger([
-          {
-            mode: LoggerMode.CONSOLE,
-            min: LogLevel.INFO
-          }
-        ])
-        this.context.mountService("logger", logger).then(() => {
-          // OK!
-        })
-      }
-    }
-  }
-
-  private getLogger() {
-    return this.context.getServiceSafe("logger") as Logger | undefined
-  }
-
   async prepare() {
-    await this.loadLogger()
-    this.getLogger()?.info(MysqlMigrationHandler.name, "Checking database migration settings...");
+    if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), "Checking database migration settings...")
     let query = QueryCreateTable(MIGRATION_HISTORY_TABLE, true)
       .addColumn("id", MysqlDataType.INT, {autoincrement: true, primaryKey: true, nullable: false})
       .addColumn("migration_name", MysqlDataType.TEXT, {nullable: false})
@@ -89,14 +71,22 @@ export class MysqlMigrationHandler {
           await m.up(this.db);
           let mh = new MysqlMigrationHistory({migration_name: migration.name});
           await mh.insert(this.db);
-          this.getLogger()?.success(MysqlMigrationHandler.name, `${migration.name} migration implemented successfully!`);
+          if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Migration '${migration.name}' implemented successfully!`)
         } catch(err) {
-          this.getLogger()?.error(MysqlMigrationHandler.name, `${migration.name} migration has errors!`, err);
-          throw err
+          let e: any
+          if (err instanceof MysqlCoreError) {
+            e = err
+          } else if (err instanceof Error) {
+            e = new MysqlCoreError(err.message)
+          } else {
+            e = new MysqlCoreError(err)
+          }
+          if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Migration '${migration.name}' has errors!`, e)
+          throw e
         }
       }
     }
-    this.getLogger()?.info(MysqlMigrationHandler.name, `Database is up to date!`);
+    if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Database is up to date!`)
   }
 
   async rollback() {
@@ -107,15 +97,23 @@ export class MysqlMigrationHandler {
         let m = new migration();
         try {
           await m.down(this.db);
-          this.getLogger()?.success(MysqlMigrationHandler.name, `${migration.name} migration rollbacked successfully!`);
+          if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Migration '${migration.name}' rollbacked successfully!`)
           await exist.remove(this.db);
         } catch(err) {
-          this.getLogger()?.error(MysqlMigrationHandler.name, `${migration.name} migration has errors!`, err);
-          throw err
+          let e: any
+          if (err instanceof MysqlCoreError) {
+            e = err
+          } else if (err instanceof Error) {
+            e = new MysqlCoreError(err.message)
+          } else {
+            e = new MysqlCoreError(err)
+          }
+          if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Migration '${migration.name}' has errors!`, e)
+          throw e
         }
         break;
       }
     }
-    this.getLogger()?.info(MysqlMigrationHandler.name, `Done!`);
+    if (this.onStatusUpdate) this.onStatusUpdate(this.context, this.db.getName(), `Done`)
   }
 }
