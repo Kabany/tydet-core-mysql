@@ -34,6 +34,9 @@ export class MysqlEntityValidationError extends MysqlCoreError {
     this.name = this.constructor.name
     this.message = message
     this.errors = errors
+    if (errors != null && Object.keys(errors).length > 0) {
+      this.message += "\n" + JSON.stringify(errors, null, 2)
+    }
     if (Error.captureStackTrace) Error.captureStackTrace(this, MysqlEntityValidationError);
   }
 }
